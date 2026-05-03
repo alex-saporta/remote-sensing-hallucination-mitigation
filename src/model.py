@@ -19,7 +19,7 @@ class Projector(nn.Module):
         return self.model(x)
     
 
-class ChangeCaptioner(nn.Module):
+class VLM(nn.Module):
     """
     The bi-temporal VLM, follows a Llava architecture : Vision Encoder (RemoteCLIP) --> Projector --> LLM (Qwen2.5-3B)
     """
@@ -33,7 +33,7 @@ class ChangeCaptioner(nn.Module):
         self.vision_encoder = CLIPVisionModel.from_pretrained("chendelong/RemoteCLIP")
         
         # 2. Projector (Input dim depends on fusion strategy)
-        # If concat: 1024 + 1024 = 2048. If subtract: 1024 remains 1024.
+        # If concat: 1024 + 1024 = 2048. If subtract: 1024
         self.proj_in_dim = 2048 if fusion_type == "concat" else 1024
         self.projector = Projector(vision_dim=self.proj_in_dim, llm_dim=2560)
         
@@ -48,4 +48,4 @@ class ChangeCaptioner(nn.Module):
         for param in self.vision_encoder.parameters(): param.requires_grad = False
         for param in self.language_model.parameters(): param.requires_grad = False
 
-    # TODO : Implement the forward method of the ChangeCaptioner
+    # TODO : Implement the forward & generate_caption methods of the VLM
