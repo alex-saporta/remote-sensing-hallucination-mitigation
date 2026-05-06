@@ -1,5 +1,6 @@
 import json
 import torch
+import random
 from pathlib import Path
 from PIL import Image
 from torch.utils.data import Dataset, DataLoader
@@ -22,7 +23,7 @@ class SecondCCDataset(Dataset):
         self.max_length = max_length
         
         # 1. Initialize tools
-        print(f"Loading processors for {split}...")
+        print(f"Loading processors for {split}")
         self.vision_processor = AutoProcessor.from_pretrained("openai/clip-vit-large-patch14")
         self.tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen2.5-3B")
         
@@ -37,7 +38,7 @@ class SecondCCDataset(Dataset):
         self.samples = [s for s in all_entries if s.get("split") == split]
         
         if len(self.samples) == 0:
-            print(f"Warning: No samples found for split '{split}'. Check your JSON 'split' keys.")
+            print(f"No samples found for split '{split}'")
         else:
             print(f"Loaded {len(self.samples)} samples for {split} split.")
 
@@ -54,37 +55,45 @@ class SecondCCDataset(Dataset):
         path_a = self.data_root / "rgb" / "A" / img_name
         path_b = self.data_root / "rgb" / "B" / img_name
         
-        # Load and ensure 3-channel RGB format
+        # Load images
         img_a = Image.open(path_a).convert("RGB")
         img_b = Image.open(path_b).convert("RGB")
         
-        # 4. Prepare Images (Resize to 224x224 & Normalize)
-        # We process both as a list to ensure identical treatment
-        vis_inputs = self.vision_processor(
-            images=[img_a, img_b], 
-            return_tensors="pt"
-        )
+        # 4. Prepare Images (resize to 224x224 & normalize) : we process both as a list to ensure identical treatment
+
+        vis_inputs = self.vision_processor(images=[img_a, img_b], return_tensors="pt")
         
         # 5. Prepare Text
-        """
-        TODO : how to handle the 5 different captions : use all ? use one ? merge the 5 into 1 ?
-        for now : only 1st caption is used 
-        """
-        caption = sample['sentences'][0]['raw']
+        prompt = "Describe the change between these two satellite images: "
+        
+        
+        #TODO : implement ≠ methods for the caption --> use a string var : caption_method = "one", "random", "five" ...
+        # first : randomly select one of the 5 captions to maximize data usage
+        caption_idx = random.randint(0, len(sample['sentences']) - 1)
+        caption = sample['sentences'][caption_idx]['raw']
+        
+        # Combine with Prompt and end of sentence token
+        full_text = f"{prompt}{caption}{self.tokenizer.eos_token}"
         
         text_inputs = self.tokenizer(
-            caption,
+            full_text,
             padding="max_length",
             truncation=True,
             max_length=self.max_length,
             return_tensors="pt"
         )
 
+        # Calculate prompt length for label masking later
+        prompt_ids = self.tokenizer(prompt, add_special_tokens=False)["input_ids"]
+        prompt_len = len(prompt_ids)
+
         return {
             "image_id": img_name,
-            "pixel_values_a": vis_inputs['pixel_values'][0], # Shape: [3, 224, 224]
-            "pixel_values_b": vis_inputs['pixel_values'][1], # Shape: [3, 224, 224]
+            "pixel_values_a": vis_inputs['pixel_values'][0],
+            "pixel_values_b": vis_inputs['pixel_values'][1],
             "input_ids": text_inputs['input_ids'].squeeze(),
             "attention_mask": text_inputs['attention_mask'].squeeze(),
+            "prompt_len": prompt_len,
             "raw_caption": caption
         }
+       
