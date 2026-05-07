@@ -1,4 +1,5 @@
 import sys
+import argparse
 import torch
 from pathlib import Path
 
@@ -9,14 +10,15 @@ sys.path.append(str(src_path))
 
 from model import VLM
 
-def test_vlm_forward():
+def test_vlm_forward(model_name="qwen2.5-3B"):
     #  1. Setup Device
     device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
     print(f"Testing on device: {device}")
 
     # 2. Initialize Model
-    print("Initializing model (this may take a minute)...")
-    model = VLM(fusion_type="concat").to(device)
+    print(f"Initializing model {model_name} (this may take a minute)...")
+    
+    model = VLM(fusion_type="concat", llm_model=model_name).to(device)
     model.eval() # Set to evaluation mode
 
     # 3. Create mock data : batch of 2, 3 channels, 224x224 pixels
@@ -50,4 +52,16 @@ def test_vlm_forward():
         print("-" * 30)
 
 if __name__ == "__main__":
-    test_vlm_forward()
+    # 3. Argparse configuration
+    parser = argparse.ArgumentParser(description="Test script for VLM forward pass.")
+    parser.add_argument(
+        "--model", 
+        type=str, 
+        default="qwen2.5-3B", 
+        help="The LLM model to use (e.g., qwen2.5-3B, qwen2.5-7B, vicuna-7b)"
+    )
+    
+    args = parser.parse_args()
+    
+    # 4. Run the test function with the retrieved argument
+    test_vlm_forward(model_name=args.model)

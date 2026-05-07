@@ -11,16 +11,18 @@ class SecondCCDataset(Dataset):
     Dataset for Remote Sensing Change Captioning.
     Links two satellite images (Time 1 and Time 2) to a change description.
     """
-    def __init__(self, json_path, data_root, split="train", max_length=128):
+    def __init__(self, json_path, data_root, split="train", max_length=128, caption_method="random"):
         """
         Args:
             json_path: Path to the SECOND-CC-AUG.json file.
             data_root: Path to the 'data' directory.
             split: 'train', 'val', or 'test'.
             max_length: Maximum sentence length for the LLM.
+            caption_method: Method for selecting captions ('random', 'one', 'five').
         """
         self.data_root = Path(data_root) / split
         self.max_length = max_length
+        self.caption_method = caption_method
         
         # 1. Initialize tools
         print(f"Loading processors for {split}")
@@ -67,10 +69,37 @@ class SecondCCDataset(Dataset):
         prompt = "Describe the change between these two satellite images: "
         
         
-        #TODO : implement ≠ methods for the caption --> use a string var : caption_method = "one", "random", "five" ...
-        # first : randomly select one of the 5 captions to maximize data usage
-        caption_idx = random.randint(0, len(sample['sentences']) - 1)
-        caption = sample['sentences'][caption_idx]['raw']
+        sentences = sample['sentences']
+        
+        # Map string numbers to their corresponding list index
+        index_map = {
+            "one": 0, 
+            "two": 1, 
+            "three": 2, 
+            "four": 3, 
+            "five": 4
+        }
+        
+        if self.caption_method in index_map:
+            # Get the requested index
+            target_idx = index_map[self.caption_method]
+            # Safety check: ensure we don't go out of bounds if a sample has fewer than 5 captions
+            safe_idx = min(target_idx, len(sentences) - 1)
+            caption = sentences[safe_idx]['raw']
+            
+        elif self.caption_method == "random":
+            # Randomly select one of the available captions
+            caption_idx = random.randint(0, len(sentences) - 1)
+            caption = sentences[caption_idx]['raw']
+            
+        elif self.caption_method == "merge":
+            # Add a period between each sentence, and a final period at the very end
+            caption = ". ".join([s['raw'].strip() for s in sentences]) + "."
+            
+        else:
+            valid_methods = list(index_map.keys()) + ["random", "merge"]
+            raise ValueError(f"Unknown caption_method: '{self.caption_method}'. Use one of: {valid_methods}")
+        # -------------------------
         
         # Combine with Prompt and end of sentence token
         full_text = f"{prompt}{caption}{self.tokenizer.eos_token}"

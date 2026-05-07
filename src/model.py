@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from transformers import CLIPVisionModel, CLIPModel, AutoModelForCausalLM
+from transformers import CLIPVisionModel, CLIPModel, AutoModelForCausalLM, AutoConfig
 
 class Projector(nn.Module):
     def __init__(self, vision_dim, llm_dim=2048):
@@ -15,7 +15,7 @@ class Projector(nn.Module):
         return self.model(x)
 
 class VLM(nn.Module):
-    def __init__(self, fusion_type="concat"):
+    def __init__(self, fusion_type="concat", llm_model="qwen2.5-3B"):
         super().__init__()
         self.fusion_type = fusion_type 
         
@@ -36,15 +36,28 @@ class VLM(nn.Module):
         # 2. Projector logic
         self.proj_in_dim = 2048 if fusion_type == "concat" else 1024
 
-        #TODO : When implementing with ≠ LLMS change this variable --> create a llm_model variable as a string "qwen2.5", "vicuna"
-        llm_dim = 2048
+        llm_registry = {
+            "qwen2.5-3B": "Qwen/Qwen2.5-3B",
+            "qwen2.5-7B": "Qwen/Qwen2.5-7B",
+            "vicuna-7b": "lmsys/vicuna-7b-v1.5"
+        }
+
+        if llm_model not in llm_registry:
+            raise ValueError(f"Unrecognized LLM model: '{llm_model}'. Available options: {list(llm_registry.keys())}")
+
+        hf_model_id = llm_registry[llm_model]
+
+        # Dynamically fetching the LLM's hidden size
+        print(f"Fetching config for {hf_model_id} to get hidden dimensions...")
+        config = AutoConfig.from_pretrained(hf_model_id, trust_remote_code=True)
+        llm_dim = config.hidden_size
         
         self.projector = Projector(vision_dim=self.proj_in_dim, llm_dim=llm_dim)
         
         # 3. LLM
-        print("Loading LLM")
+        print(f"Loading LLM: {hf_model_id}")
         self.language_model = AutoModelForCausalLM.from_pretrained(
-            "Qwen/Qwen2.5-3B", 
+            hf_model_id, 
             trust_remote_code=True,
             torch_dtype=torch.float16 if torch.backends.mps.is_available() else torch.float32,
             low_cpu_mem_usage=True
