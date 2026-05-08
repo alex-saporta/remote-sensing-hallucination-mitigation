@@ -1,6 +1,8 @@
 import torch
+import open_clip
 import torch.nn as nn
-from transformers import CLIPVisionModel, CLIPModel, AutoModelForCausalLM, AutoConfig
+from huggingface_hub import hf_hub_download
+from transformers import AutoModelForCausalLM, AutoConfig
 
 class Projector(nn.Module):
     def __init__(self, vision_dim, llm_dim=2048):
@@ -15,26 +17,34 @@ class Projector(nn.Module):
         return self.model(x)
 
 class VLM(nn.Module):
-    def __init__(self, fusion_type="concat", llm_model="qwen2.5-3B"):
+    def __init__(self, fusion_type="concat", llm_model="qwen2.5-3B", vision_type="RemoteCLIP"):
         super().__init__()
-        self.fusion_type = fusion_type 
-        
-        # 1. Vision Encoder
-        print("Loading Vision Encoder architecture")
-        # Load the base ViT-L/14 architecture
-        self.vision_encoder = CLIPVisionModel.from_pretrained("openai/clip-vit-large-patch14")
-        
-        try:
-            print("Attempting to load RemoteCLIP weights")
-            # We load the full CLIPModel to get the weights, then transfer them
-            remote_clip = CLIPModel.from_pretrained("chendelong/RemoteCLIP")
-            self.vision_encoder.load_state_dict(remote_clip.vision_model.state_dict())
-            print("Successfully loaded RemoteCLIP weights")
-        except Exception as e:
-            print(f"Note: RemoteCLIP weights not applied ({e}), using standard CLIP instead")
+        self.fusion_type = fusion_type
+        model_name = "ViT-L-14"  # OpenCLIP model name (can be changed to other variants if desired)
 
+        # 1. Vision Encoder
+        print("Loading Vision Encoder architecture via OpenCLIP")
+        try:
+            print(f"Attempting to load {vision_type} weights via OpenCLIP")
+            checkpoint_path = hf_hub_download("chendelong/RemoteCLIP", f"RemoteCLIP-{model_name}.pt")
+            clip_model = open_clip.create_model(model_name)
+            ckpt = torch.load(checkpoint_path, map_location="cpu")
+            clip_model.load_state_dict(ckpt)
+            
+            self.vision_encoder = clip_model.visual
+            
+            print("Successfully loaded RemoteCLIP weights")   
+        except Exception as e:
+            print(f"Note: RemoteCLIP weights not applied ({e}), using standard OpenCLIP ViT-L-14 instead")
+            # Fallback vers les poids OpenAI standards via OpenCLIP
+            clip_model = open_clip.create_model(model_name, pretrained="openai")
+            self.vision_encoder = clip_model.visual
+
+        # Determine vision output dimension (some models have a separate attribute, others use the projection layer)
+        vision_out_dim = getattr(self.vision_encoder, 'output_dim', 768)
+        
         # 2. Projector logic
-        self.proj_in_dim = 2048 if fusion_type == "concat" else 1024
+        self.proj_in_dim = vision_out_dim * 2 if fusion_type == "concat" else vision_out_dim
 
         llm_registry = {
             "qwen2.5-3B": "Qwen/Qwen2.5-3B",
@@ -69,13 +79,15 @@ class VLM(nn.Module):
 
     def forward(self, pixel_values_a, pixel_values_b, input_ids, attention_mask=None, labels=None):
         
+        device = next(self.vision_encoder.parameters()).device
+        
         # 1. Encode
-        pixel_values_a = pixel_values_a.to(self.vision_encoder.device)
-        pixel_values_b = pixel_values_b.to(self.vision_encoder.device)
+        pixel_values_a = pixel_values_a.to(device)
+        pixel_values_b = pixel_values_b.to(device)
 
         with torch.no_grad():
-            feat_a = self.vision_encoder(pixel_values_a).last_hidden_state[:, 0, :] 
-            feat_b = self.vision_encoder(pixel_values_b).last_hidden_state[:, 0, :]
+            feat_a = self.vision_encoder(pixel_values_a) 
+            feat_b = self.vision_encoder(pixel_values_b)
 
         # 2. Fusion
         if self.fusion_type == "concat":
@@ -83,11 +95,11 @@ class VLM(nn.Module):
         else:
             fused_feat = feat_b - feat_a
 
-        # 3. Project to LLM space (Batch, 1, 2048)
+        # 3. Project to LLM space (Batch, 1, llm_dim)
         visual_embeds = self.projector(fused_feat).unsqueeze(1)
         visual_embeds = visual_embeds.to(self.language_model.dtype)
 
-        # 4. Text embeddings (Batch, Seq, 2048)
+        # 4. Text embeddings (Batch, Seq, llm_dim)
         text_embeds = self.language_model.get_input_embeddings()(input_ids)
 
         # 5. Concatenate
