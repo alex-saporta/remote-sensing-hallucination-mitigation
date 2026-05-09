@@ -1,8 +1,9 @@
 import torch
 import open_clip
+import timm
 import torch.nn as nn
 from huggingface_hub import hf_hub_download
-from transformers import AutoModelForCausalLM, AutoConfig
+from transformers import CLIPVisionModel, AutoModelForCausalLM, AutoConfig
 
 class Projector(nn.Module):
     def __init__(self, vision_dim, llm_dim=2048):
@@ -17,65 +18,144 @@ class Projector(nn.Module):
         return self.model(x)
 
 class VLM(nn.Module):
-    def __init__(self, fusion_type="concat", llm_model="qwen2.5-3B", vision_type="RemoteCLIP"):
+    def __init__(self, fusion_type="concat", llm_model="qwen2.5-3B", vision_type="standard"):
         super().__init__()
         self.fusion_type = fusion_type
-        model_name = "ViT-L-14"  # OpenCLIP model name (can be changed to other variants if desired)
 
-        # 1. Vision Encoder
+        # ViT-L-14 is the default backbone; swap here to try other OpenCLIP variants
+        model_name = "ViT-L-14"
+
+        # ------------------------------------------------------------------ #
+        # 1. Vision Encoder                                                    #
+        # ------------------------------------------------------------------ #
         print("Loading Vision Encoder architecture via OpenCLIP")
-        try:
-            print(f"Attempting to load {vision_type} weights via OpenCLIP")
-            checkpoint_path = hf_hub_download("chendelong/RemoteCLIP", f"RemoteCLIP-{model_name}.pt")
-            clip_model = open_clip.create_model(model_name)
-            ckpt = torch.load(checkpoint_path, map_location="cpu")
-            clip_model.load_state_dict(ckpt)
-            
-            self.vision_encoder = clip_model.visual
-            
-            print("Successfully loaded RemoteCLIP weights")   
-        except Exception as e:
-            print(f"Note: RemoteCLIP weights not applied ({e}), using standard OpenCLIP ViT-L-14 instead")
-            # Fallback vers les poids OpenAI standards via OpenCLIP
-            clip_model = open_clip.create_model(model_name, pretrained="openai")
-            self.vision_encoder = clip_model.visual
+        self.vision_encoder = self._load_vision_encoder(vision_type, model_name)
+        vision_out_dim = getattr(self.vision_encoder, "output_dim", 768)
 
-        # Determine vision output dimension (some models have a separate attribute, others use the projection layer)
-        vision_out_dim = getattr(self.vision_encoder, 'output_dim', 768)
-        
-        # 2. Projector logic
+        # ------------------------------------------------------------------ #
+        # 2. Projector                                                         #
+        # ------------------------------------------------------------------ #
+        # Concatenation fusion doubles the input dimension to the projector
         self.proj_in_dim = vision_out_dim * 2 if fusion_type == "concat" else vision_out_dim
 
         llm_registry = {
             "qwen2.5-3B": "Qwen/Qwen2.5-3B",
             "qwen2.5-7B": "Qwen/Qwen2.5-7B",
-            "vicuna-7b": "lmsys/vicuna-7b-v1.5"
+            "vicuna-7b":  "lmsys/vicuna-7b-v1.5",
         }
-
         if llm_model not in llm_registry:
-            raise ValueError(f"Unrecognized LLM model: '{llm_model}'. Available options: {list(llm_registry.keys())}")
-
+            raise ValueError(
+                f"Unrecognized LLM model: '{llm_model}'. "
+                f"Available options: {list(llm_registry.keys())}"
+            )
         hf_model_id = llm_registry[llm_model]
 
-        # Dynamically fetching the LLM's hidden size
-        print(f"Fetching config for {hf_model_id} to get hidden dimensions...")
-        config = AutoConfig.from_pretrained(hf_model_id, trust_remote_code=True)
-        llm_dim = config.hidden_size
-        
+        # Fetch hidden size from the model config instead of hard-coding it
+        print(f"Fetching config for {hf_model_id} to determine hidden dimension …")
+        llm_dim = AutoConfig.from_pretrained(hf_model_id, trust_remote_code=True).hidden_size
+
         self.projector = Projector(vision_dim=self.proj_in_dim, llm_dim=llm_dim)
-        
-        # 3. LLM
+
+        # ------------------------------------------------------------------ #
+        # 3. Language Model                                                    #
+        # ------------------------------------------------------------------ #
         print(f"Loading LLM: {hf_model_id}")
         self.language_model = AutoModelForCausalLM.from_pretrained(
-            hf_model_id, 
+            hf_model_id,
             trust_remote_code=True,
             torch_dtype=torch.float16 if torch.backends.mps.is_available() else torch.float32,
-            low_cpu_mem_usage=True
+            low_cpu_mem_usage=True,
         )
 
-        # Freeze model weights : only want to train Projector
-        for param in self.vision_encoder.parameters(): param.requires_grad = False
-        for param in self.language_model.parameters(): param.requires_grad = False
+        # Freeze vision encoder and LLM — only the projector is trained
+        for param in self.vision_encoder.parameters():
+            param.requires_grad = False
+        for param in self.language_model.parameters():
+            param.requires_grad = False
+
+
+    # ------------------------------------------------------------------ #
+    # Vision-encoder factory (extracted from __init__ for readability)   #
+    # ------------------------------------------------------------------ #
+    def _load_vision_encoder(self, vision_type: str, model_name: str):
+        """Instantiate and return the requested vision encoder."""
+
+        if vision_type == "standard":
+            return self._load_openclip(model_name)
+
+        if vision_type == "RemoteCLIP":
+            return self._load_remoteclip(model_name)
+
+        if vision_type == "SkyCLIP":
+            return self._load_skyclip(model_name)
+
+        raise ValueError(
+            f"Unrecognized vision_type: '{vision_type}'. "
+            f"Available options: ['RemoteCLIP', 'SkyCLIP', 'standard']"
+        )
+
+
+    def _load_openclip(self, model_name: str):
+        """Load standard OpenCLIP ViT weights (OpenAI pretrained)."""
+        clip_model = open_clip.create_model(model_name, pretrained="openai")
+        return clip_model.visual
+
+
+    def _load_remoteclip(self, model_name: str):
+        """
+        Attempt to load RemoteCLIP weights from the Hub.
+        Falls back to standard OpenCLIP on failure.
+        """
+        try:
+            print(f"Attempting to load RemoteCLIP weights via OpenCLIP …")
+            checkpoint_path = hf_hub_download(
+                "chendelong/RemoteCLIP", f"RemoteCLIP-{model_name}.pt"
+            )
+            clip_model = open_clip.create_model(model_name)
+            clip_model.load_state_dict(torch.load(checkpoint_path, map_location="cpu"))
+            print("Successfully loaded RemoteCLIP weights.")
+            return clip_model.visual
+
+        except Exception as e:
+            print(f"RemoteCLIP weights unavailable ({e}). Falling back to standard OpenCLIP.")
+            return self._load_openclip(model_name)
+
+
+    def _load_skyclip(self, model_name: str):
+        """
+        Attempt to load SkyCLIP weights from the Hub via timm.
+        Falls back to standard OpenCLIP on failure.
+        """
+        try:
+            print("Attempting to load SkyCLIP weights via HuggingFace Hub …")
+            checkpoint_path = hf_hub_download(
+                "BiliSakura/SkyCLIP-ViT-L-14", "SkyCLIP-ViT-L-14.pth"
+            )
+
+            # Build a timm ViT-L/14 backbone (no classification head; returns CLS token, dim=1024)
+            timm_model = timm.create_model(
+                "vit_large_patch14_224",
+                pretrained=False,
+                num_classes=0,
+            )
+
+            ckpt = torch.load(checkpoint_path, map_location="cpu")
+            state_dict = {
+                k.replace("visual.", ""): v
+                for k, v in ckpt.get("state_dict", ckpt).items()
+            }
+
+            missing, unexpected = timm_model.load_state_dict(state_dict, strict=False)
+            print(f"SkyCLIP checkpoint loaded — missing keys: {len(missing)}, unexpected keys: {len(unexpected)}")
+
+            # Expose output_dim so the rest of __init__ can query it uniformly
+            timm_model.output_dim = timm_model.num_features
+            print("Successfully loaded SkyCLIP weights.")
+            return timm_model
+
+        except Exception as e:
+            print(f"SkyCLIP weights unavailable ({e}). Falling back to standard OpenCLIP.")
+            return self._load_openclip(model_name)
 
     def forward(self, pixel_values_a, pixel_values_b, input_ids, attention_mask=None, labels=None):
         
