@@ -11,11 +11,12 @@ class SecondCCDataset(Dataset):
     Dataset for Remote Sensing Change Captioning.
     Links two satellite images (Time 1 and Time 2) to a change description.
     """
-    def __init__(self, json_path, data_root, split="train", max_length=128, caption_method="random"):
+    def __init__(self, json_path, data_root, llm_model="qwen2.5-3B", split="train", max_length=128, caption_method="random"):
         """
         Args:
             json_path: Path to the SECOND-CC-AUG.json file.
             data_root: Path to the 'data' directory.
+            llm_model: String identifying the LLM (used to select tokenizer).
             split: 'train', 'val', or 'test'.
             max_length: Maximum sentence length for the LLM.
             caption_method: Method for selecting captions ('random', 'one', 'five').
@@ -25,10 +26,25 @@ class SecondCCDataset(Dataset):
         self.caption_method = caption_method
         
         # 1. Initialize tools
-        print(f"Loading processors for {split}")
-        self.vision_processor = AutoProcessor.from_pretrained("openai/clip-vit-large-patch14")
-        self.tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen2.5-3B")
+        llm_registry = {
+            "qwen2.5-3B": "Qwen/Qwen2.5-3B",
+            "qwen2.5-7B": "Qwen/Qwen2.5-7B",
+            "vicuna-7b":  "lmsys/vicuna-7b-v1.5",
+        }
         
+        if llm_model not in llm_registry:
+            raise ValueError(f"LLM {llm_model} not in registry. Use: {list(llm_registry.keys())}")
+        
+        tokenizer_id = llm_registry[llm_model]
+        print(f"Loading processor and tokenizer for: {llm_model} ({split})")
+
+        self.vision_processor = AutoProcessor.from_pretrained("openai/clip-vit-large-patch14")
+        self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_id, trust_remote_code=True)
+
+        # Ensure padding token exists 
+        if self.tokenizer.pad_token is None:
+            self.tokenizer.pad_token = self.tokenizer.eos_token
+                                                               
         # 2. Parse the JSON structure
         with open(json_path, 'r') as f:
             full_data = json.load(f)
@@ -50,35 +66,25 @@ class SecondCCDataset(Dataset):
     def __getitem__(self, idx):
         sample = self.samples[idx]
         
-        # filename from JSON file of dataset
+        # 1. Get filename from JSON file of dataset
         img_name = sample['filename']
         
-        # Construct paths to RGB images (A = Before, B = After)
+        # 2. Construct paths to RGB images (A = Before, B = After)
         path_a = self.data_root / "rgb" / "A" / img_name
         path_b = self.data_root / "rgb" / "B" / img_name
         
-        # Load images
+        # 3. Load images
         img_a = Image.open(path_a).convert("RGB")
         img_b = Image.open(path_b).convert("RGB")
         
-        # 4. Prepare Images (resize to 224x224 & normalize) : we process both as a list to ensure identical treatment
-
+        # 4. Prepare Images : we process both as a list to ensure identical treatment
         vis_inputs = self.vision_processor(images=[img_a, img_b], return_tensors="pt")
         
         # 5. Prepare Text
         prompt = "Describe the change between these two satellite images: "
-        
-        
         sentences = sample['sentences']
-        
         # Map string numbers to their corresponding list index
-        index_map = {
-            "one": 0, 
-            "two": 1, 
-            "three": 2, 
-            "four": 3, 
-            "five": 4
-        }
+        index_map = {"one": 0, "two": 1, "three": 2, "four": 3, "five": 4}
         
         if self.caption_method in index_map:
             # Get the requested index
@@ -99,9 +105,8 @@ class SecondCCDataset(Dataset):
         else:
             valid_methods = list(index_map.keys()) + ["random", "merge"]
             raise ValueError(f"Unknown caption_method: '{self.caption_method}'. Use one of: {valid_methods}")
-        # -------------------------
         
-        # Combine with Prompt and end of sentence token
+        # Combine with prompt and end of sentence token
         full_text = f"{prompt}{caption}{self.tokenizer.eos_token}"
         
         text_inputs = self.tokenizer(
