@@ -89,9 +89,12 @@ class VLM(nn.Module):
         if vision_type == "SkyCLIP":
             return self._load_skyclip(model_name)
 
+        if vision_type == "GeoRSCLIP":
+            return self._load_georsclip(model_name)
+
         raise ValueError(
             f"Unrecognized vision_type: '{vision_type}'. "
-            f"Available options: ['RemoteCLIP', 'SkyCLIP', 'standard']"
+            f"Available options: ['RemoteCLIP', 'SkyCLIP', 'GeoRSCLIP', 'standard']"
         )
 
 
@@ -155,6 +158,26 @@ class VLM(nn.Module):
 
         except Exception as e:
             print(f"SkyCLIP weights unavailable ({e}). Falling back to standard OpenCLIP.")
+            return self._load_openclip(model_name)
+        
+    def _load_georsclip(self, model_name: str):
+        """
+        Attempt to load GeoRSCLIP weights from the Hub.
+        Falls back to standard OpenCLIP on failure.
+        """
+        try:
+            print(f"Attempting to load GeoRSCLIP weights via OpenCLIP …")
+            checkpoint_path = hf_hub_download(
+                "Zilun/GeoRSCLIP", f"RS5M_{model_name}.pt",
+                subfolder="ckpt"
+            )
+            clip_model = open_clip.create_model(model_name)
+            clip_model.load_state_dict(torch.load(checkpoint_path, map_location="cpu"))
+            print("Successfully loaded GeoRSCLIP weights.")
+            return clip_model.visual
+
+        except Exception as e:
+            print(f"GeoRSCLIP weights unavailable ({e}). Falling back to standard OpenCLIP.")
             return self._load_openclip(model_name)
 
     def forward(self, pixel_values_a, pixel_values_b, input_ids, attention_mask=None, labels=None):

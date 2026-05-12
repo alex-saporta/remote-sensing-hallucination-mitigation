@@ -70,7 +70,7 @@ if __name__ == "__main__":
         "--vlm",
         type=str,
         default="standard",
-        help="The vision model to use (e.g., RemoteCLIP, SkyCLIP, standard)"
+        help="The vision model to use (e.g., RemoteCLIP, SkyCLIP, GeoRSCLIP, standard)"
     )
 
     args = parser.parse_args()
