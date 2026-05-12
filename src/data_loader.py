@@ -4,14 +4,66 @@ import random
 from pathlib import Path
 from PIL import Image
 from torch.utils.data import Dataset, DataLoader
-from transformers import AutoProcessor, AutoTokenizer
+from transformers import AutoProcessor, AutoTokenizer, pipeline
+
+def precompute_merge_captions(json_path, output_path, model_id="Qwen/Qwen2.5-1.5B-Instruct", limit=None):
+    """
+    Pre-computes summarized captions for all samples using a LLM.
+    Run this once before training to generate merge_captions.json.
+    
+    Args:
+        json_path: Path to the SECOND-CC-AUG.json file.
+        output_path: Path to save the resulting JSON (e.g., 'merge_captions.json').
+        model_id: HuggingFace model ID to use for summarization.
+        limit: Optional integer to limit the number of samples processed (for testing).
+    """
+    with open(json_path) as f:
+        full_data = json.load(f)
+
+    summarizer = pipeline(
+        "text-generation",
+        model=model_id,
+        device_map="auto",
+        max_new_tokens=35,
+    )
+
+    results = {}
+    all_samples = full_data.get("images", [])
+    # Apply limit for testing
+    if limit is not None:
+        all_samples = all_samples[:limit]
+        print(f"  (limited to {limit} samples for testing)")
+    
+    print(f"Pre-computing merge captions for {len(all_samples)} samples...")
+
+    for i, sample in enumerate(all_samples):
+        numbered = "\n".join(
+            f"{i+1}. {s['raw'].strip()}" for i, s in enumerate(sample["sentences"])
+        )
+        prompt = (
+            "You are given several descriptions of changes observed between two satellite images. "
+            "Write a single, concise sentence (maximum 15 words) that summarizes all changes mentioned.\n\n"
+            f"Descriptions:\n{numbered}\n\nSummary:"
+        )
+        output = summarizer(prompt, do_sample=False, temperature=None, top_p=None)[0]["generated_text"]
+        caption = output.split("Summary:")[-1].strip().split("\n")[0].strip()
+        results[sample["filename"]] = caption
+
+        if (i + 1) % 100 == 0:
+            print(f"  Processed {i + 1}/{len(all_samples)} samples...")
+
+    with open(output_path, "w") as f:
+        json.dump(results, f, indent=2)
+
+    print(f"Saved {len(results)} captions to {output_path}")
 
 class SecondCCDataset(Dataset):
     """
     Dataset for Remote Sensing Change Captioning.
     Links two satellite images (Time 1 and Time 2) to a change description.
     """
-    def __init__(self, json_path, data_root, llm_model="qwen2.5-3B", split="train", max_length=128, caption_method="random"):
+    def __init__(self, json_path, data_root, llm_model="qwen2.5-3B", split="train", 
+                max_length=128, caption_method="random", merge_captions_path=None):
         """
         Args:
             json_path: Path to the SECOND-CC-AUG.json file.
@@ -20,6 +72,7 @@ class SecondCCDataset(Dataset):
             split: 'train', 'val', or 'test'.
             max_length: Maximum sentence length for the LLM.
             caption_method: Method for selecting captions ('random', 'one', 'five').
+            merge_captions_path: Path to the pre-computed merge captions JSON (required if caption_method='merge').
         """
         self.data_root = Path(data_root) / split
         self.max_length = max_length
@@ -44,6 +97,19 @@ class SecondCCDataset(Dataset):
         # Ensure padding token exists 
         if self.tokenizer.pad_token is None:
             self.tokenizer.pad_token = self.tokenizer.eos_token
+        
+        # Load pre-computed merge captions if needed
+        if caption_method == "merge":
+            if merge_captions_path is None:
+                raise ValueError(
+                    "caption_method='merge' requires a pre-computed captions file. "
+                    "Please provide 'merge_captions_path', or run precompute_merge_captions() first."
+                )
+            with open(merge_captions_path) as f:
+                self.merge_captions = json.load(f)
+            print(f"Loaded pre-computed merge captions from: {merge_captions_path}")
+        else:
+            self.merge_captions = None
                                                                
         # 2. Parse the JSON structure
         with open(json_path, 'r') as f:
@@ -99,8 +165,12 @@ class SecondCCDataset(Dataset):
             caption = sentences[caption_idx]['raw']
             
         elif self.caption_method == "merge":
-            # Add a period between each sentence, and a final period at the very end
-            caption = ". ".join([s['raw'].strip() for s in sentences]) + "."
+            caption = self.merge_captions.get(img_name)
+            if caption is None:
+                raise KeyError(
+                    f"No pre-computed merge caption found for '{img_name}'. "
+                    "Re-run precompute_merge_captions() to regenerate the file."
+                )
             
         else:
             valid_methods = list(index_map.keys()) + ["random", "merge"]

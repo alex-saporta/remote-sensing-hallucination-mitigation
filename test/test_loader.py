@@ -8,7 +8,7 @@ current_dir = Path(__file__).resolve().parent
 src_path = current_dir.parent / "src"
 sys.path.append(str(src_path))
 
-from data_loader import SecondCCDataset
+from data_loader import SecondCCDataset, precompute_merge_captions
 
 def test_dataloader(split="train", caption_method="random"):
     print(f"Testing DataLoader with split='{split}' and caption_method='{caption_method}'...")
@@ -56,6 +56,27 @@ def test_dataloader(split="train", caption_method="random"):
     except Exception as e:
         print(f"Error during batch fetching: {e}")
 
+def test_precompute(json_path, output_path, model_id, limit):
+    print(f"Running precompute_merge_captions...")
+    print(f"  JSON path:   {json_path}")
+    print(f"  Output path: {output_path}")
+    print(f"  Model:       {model_id}")
+    print("-" * 50)
+
+    try:
+        precompute_merge_captions(
+            json_path=json_path,
+            output_path=output_path,
+            model_id=model_id,
+            limit=limit
+        )
+        print("-" * 50)
+        print(f"SUCCESS! Merge captions saved to: {output_path}")
+
+    except Exception as e:
+        print(f"Failed to precompute merge captions: {e}")
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Test script for the VLM DataLoader.")
     parser.add_argument(
@@ -73,7 +94,57 @@ if __name__ == "__main__":
         choices=["one", "two", "three", "four", "five", "random", "merge"],
         help="Caption selection method to test"
     )
-    
+
+    parser.add_argument(
+        "--merge_captions_path",
+        type=str,
+        default="data/merge_captions_test.json",
+        help="Path to pre-computed merge captions JSON (default: data/merge_captions_test.json)"
+    )
+
+    # Precompute-specific arguments
+    parser.add_argument(
+        "--precompute",
+        action="store_true",
+        help="Run precompute_merge_captions() instead of testing the dataloader"
+    )
+    parser.add_argument(
+        "--precompute_model",
+        type=str,
+        default="Qwen/Qwen2.5-1.5B-Instruct",
+        help="HuggingFace model ID to use for precomputing merge captions (default: Qwen/Qwen2.5-1.5B-Instruct)"
+    )
+
+    parser.add_argument(
+    "--precompute_limit",
+    type=int,
+    default=2,
+    help="Limit the number of samples to precompute (for testing purposes)"
+    )
+
     args = parser.parse_args()
-    
-    test_dataloader(split=args.split, caption_method=args.method)
+
+    if args.precompute:
+        test_precompute(
+            json_path="data/SECOND-CC-AUG.json",
+            output_path=args.merge_captions_path,
+            model_id=args.precompute_model,
+            limit=args.precompute_limit
+        )
+
+    else:
+        # Early check before loading the dataset
+        if args.method == "merge" and not Path(args.merge_captions_path).exists():
+            print(
+                f"Error: --method=merge requires a pre-computed captions file.\n"
+                f"File not found: '{args.merge_captions_path}'\n\n"
+                f"Run precompute first:\n"
+                f"  python test_loader.py --precompute --merge_captions_path {args.merge_captions_path}"
+            )
+            sys.exit(1)
+
+        test_dataloader(
+            split=args.split,
+            caption_method=args.method,
+            merge_captions_path=args.merge_captions_path if args.method == "merge" else None
+        )
