@@ -25,23 +25,20 @@ class VLM(nn.Module):
         # ViT-L-14 is the default backbone; swap here to try other OpenCLIP variants
         model_name = "ViT-L-14"
 
-        # ------------------------------------------------------------------ #
-        # 1. Vision Encoder                                                    #
-        # ------------------------------------------------------------------ #
+        # 1. Vision Encoder
         print("Loading Vision Encoder architecture via OpenCLIP")
         self.vision_encoder = self._load_vision_encoder(vision_type, model_name)
         vision_out_dim = getattr(self.vision_encoder, "output_dim", 768)
 
-        # ------------------------------------------------------------------ #
-        # 2. Projector                                                         #
-        # ------------------------------------------------------------------ #
+        # 2. Projector
         # Concatenation fusion doubles the input dimension to the projector
         self.proj_in_dim = vision_out_dim * 2 if fusion_type == "concat" else vision_out_dim
 
         llm_registry = {
-            "qwen2.5-3B": "Qwen/Qwen2.5-3B",
             "qwen2.5-7B": "Qwen/Qwen2.5-7B",
             "vicuna-7b":  "lmsys/vicuna-7b-v1.5",
+            "mistral-7b": "mistralai/Mistral-7B-v0.1",
+            "llama2-7b":  "meta-llama/Llama-2-7b-hf",
         }
         if llm_model not in llm_registry:
             raise ValueError(
@@ -56,9 +53,7 @@ class VLM(nn.Module):
 
         self.projector = Projector(vision_dim=self.proj_in_dim, llm_dim=llm_dim)
 
-        # ------------------------------------------------------------------ #
-        # 3. Language Model                                                    #
-        # ------------------------------------------------------------------ #
+        # 3. LLM
         print(f"Loading LLM: {hf_model_id}")
         self.language_model = AutoModelForCausalLM.from_pretrained(
             hf_model_id,
@@ -74,9 +69,8 @@ class VLM(nn.Module):
             param.requires_grad = False
 
 
-    # ------------------------------------------------------------------ #
-    # Vision-encoder factory (extracted from __init__ for readability)   #
-    # ------------------------------------------------------------------ #
+    # Vision-encoder factory (extracted from __init__ for readability)
+
     def _load_vision_encoder(self, vision_type: str, model_name: str):
         """Instantiate and return the requested vision encoder."""
 
@@ -227,3 +221,45 @@ class VLM(nn.Module):
             labels=full_labels,
             return_dict=True
         )
+
+    def generate(self, pixel_values_a, pixel_values_b, tokenizer, max_new_tokens=50, device="cuda"):
+            """
+            Inference method to generate a caption for a given image pair.
+            """
+            # 1. Encode and fusion images
+            with torch.no_grad():
+                feat_a = self.vision_encoder(pixel_values_a.to(device))
+                feat_b = self.vision_encoder(pixel_values_b.to(device))
+
+                if self.fusion_type == "concat":
+                    fused_feat = torch.cat([feat_a, feat_b], dim=-1)
+                else:
+                    fused_feat = feat_b - feat_a
+
+                # 2. Project to LLM space
+                visual_embeds = self.projector(fused_feat).unsqueeze(1) # [Batch, 1, llm_dim]
+                visual_embeds = visual_embeds.to(self.language_model.dtype)
+
+                # 3. Prepare the Prompt
+                prompt = "Describe the change between these two satellite images: "
+                input_ids = tokenizer(prompt, return_tensors="pt").input_ids.to(device)
+                text_embeds = self.language_model.get_input_embeddings()(input_ids)
+
+                # 4. Concatenate visual prefix with prompt
+                inputs_embeds = torch.cat([visual_embeds, text_embeds], dim=1)
+                inputs_embeds = inputs_embeds.to(self.language_model.dtype)
+
+                # 5. Generate tokens
+                output_ids = self.language_model.generate(
+                    inputs_embeds=inputs_embeds,
+                    max_new_tokens=max_new_tokens,
+                    do_sample=False, # greedy decoding for consistent metrics
+                    num_beams=1, # speed up validation
+                    eos_token_id=tokenizer.eos_token_id,
+                    pad_token_id=tokenizer.pad_token_id
+                )
+
+                # 6. Decode back to string : only decode the new tokens (=the generated caption)
+                caption = tokenizer.decode(output_ids[0], skip_special_tokens=True)
+                
+                return caption.strip()

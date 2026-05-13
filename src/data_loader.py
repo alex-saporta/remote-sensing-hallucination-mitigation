@@ -80,9 +80,10 @@ class SecondCCDataset(Dataset):
         
         # 1. Initialize tools
         llm_registry = {
-            "qwen2.5-3B": "Qwen/Qwen2.5-3B",
             "qwen2.5-7B": "Qwen/Qwen2.5-7B",
             "vicuna-7b":  "lmsys/vicuna-7b-v1.5",
+            "mistral-7b": "mistralai/Mistral-7B-v0.1",
+            "llama2-7b":  "meta-llama/Llama-2-7b-hf",
         }
         
         if llm_model not in llm_registry:
@@ -188,8 +189,7 @@ class SecondCCDataset(Dataset):
         )
 
         # Calculate prompt length for label masking later
-        prompt_ids = self.tokenizer(prompt, add_special_tokens=False)["input_ids"]
-        prompt_len = len(prompt_ids)
+        prompt_len = len(self.tokenizer(prompt, add_special_tokens=True)["input_ids"])
 
         return {
             "image_id": img_name,

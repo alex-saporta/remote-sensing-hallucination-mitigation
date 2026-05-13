@@ -1,4 +1,5 @@
 import argparse
+import json
 import torch
 import torch.optim as optim
 from torch.utils.data import DataLoader
@@ -7,20 +8,10 @@ from pathlib import Path
 import os
 from data_loader import SecondCCDataset 
 from model import VLM 
+from utils.metrics import Metrics
 
-def train():
-
-    # 1. Setup Arguments for Modular Training
-    parser = argparse.ArgumentParser(description="Bi-temporal VLM training for change captioning")
-    parser.add_argument("--vision_type", type=str, default="RemoteCLIP", choices=['RemoteCLIP', 'SkyCLIP', 'standard'])
-    parser.add_argument("--llm_model", type=str, default="qwen2.5-3B", choices=['qwen2.5-3B', 'qwen2.5-7B', 'vicuna-7b'])
-    parser.add_argument("--caption_method", type=str, default="random", choices=['one', 'two', 'three', 'four', 'five', 'random', 'merge'])
-    parser.add_argument("--batch_size", type=int, default=4)
-    parser.add_argument("--epochs", type=int, default=5)
-    parser.add_argument("--lr", type=float, default=1e-4)
-    args = parser.parse_args()
-
-    #2. Setup depends on device type
+def train(args):
+    # 1. Setup depends on device type
     if torch.cuda.is_available():
         device = torch.device("cuda")
     elif torch.backends.mps.is_available():
@@ -30,15 +21,17 @@ def train():
     
     print(f"Device: {device} | Vision: {args.vision_type} | LLM: {args.llm_model} | Caption: {args.caption_method}")
 
-    #3. Initialize model
+    # 2. Initialize model
     model = VLM(
         fusion_type="concat", 
         llm_model=args.llm_model, 
         vision_type=args.vision_type
     )
     model.to(device)
+    evaluator = Metrics(device)
 
-    #4. Data preparation
+
+    # 3. Data preparation
     current_dir = Path(__file__).resolve().parent
     project_root = current_dir.parent
     train_dataset = SecondCCDataset(
@@ -46,24 +39,40 @@ def train():
         data_root=project_root / "data", 
         llm_model=args.llm_model,
         split="train",
-        caption_method=args.caption_method
+        caption_method=args.caption_method,
+        merge_captions_path=args.merge_captions_path
     )
-    
     train_loader = DataLoader(
         train_dataset, 
         batch_size=args.batch_size, 
         shuffle=True, 
     )
 
+    val_dataset = SecondCCDataset(
+        json_path=project_root / "data" / "SECOND-CC-AUG.json",
+        data_root=project_root / "data",
+        llm_model=args.llm_model,
+        split="val", 
+        caption_method="one", # Use a fixed caption for consistent evaluation
+    )
+    val_loader = DataLoader(val_dataset, batch_size=1, shuffle=False)
+
     optimizer = optim.AdamW(model.projector.parameters(), lr=args.lr)
 
-    # 4. Training loop
-    model.train()
-    
+    # 4. Prepare evaluator
+    experiment_results = {
+        "config": vars(args), # save command line args
+        "history": [] # store metrics for every epoch
+    }
+    best_bleu = -1.0
+
+    # 5. Training loop
     for epoch in range(args.epochs):
+        # ----- Training Phase ------
+        model.train()
         epoch_loss = 0
-        pbar = tqdm(train_loader, desc=f"Epoch {epoch+1}")
-        
+        pbar = tqdm(train_loader, desc=f"Epoch {epoch+1} [Train]")
+         
         for batch in pbar:
             # Move all tensors to the detected device
             pixel_values_a = batch['pixel_values_a'].to(device)
@@ -93,16 +102,63 @@ def train():
             optimizer.step()
             
             epoch_loss += loss.item()
-            pbar.set_postfix(loss=loss.item())
+            pbar.set_postfix(loss=loss.item())  
+        # ---- Evaluation phase -----
+        model.eval()
+        all_preds = []
+        all_targets = []
+        print("Calculating quality metrics...")
+        # Only validate on a small number of samples to save time
+        num_val_samples = 50 
+        print(f"Generating captions for validation...")
 
+        with torch.no_grad():
+            for i, val_batch in enumerate(val_loader):
+                if i >= num_val_samples: break
+                
+                # TODO : check if correct generate call
+                pred_caption = model.generate(
+                    val_batch['pixel_values_a'].to(device),
+                    val_batch['pixel_values_b'].to(device),
+                    tokenizer=train_dataset.tokenizer,
+                    device=device
+                )
+                
+                all_preds.append(pred_caption)
+                all_targets.append(val_batch['raw_caption'][0])
+
+        # Evaluate the captions
+        scores = evaluator.compute_caption_quality(all_preds, all_targets)
+        evaluator.reset()
         avg_loss = epoch_loss / len(train_loader)
-        print(f"Epoch {epoch+1} Avg Loss: {avg_loss:.4f}")
+        epoch_record = {
+            "epoch": epoch + 1,
+            "loss": avg_loss,
+            "bleu4": scores['bleu4'],
+            "meteor": scores['meteor'],
+            "rougeL": scores['rouge_rougeL_fmeasure']
+        }
+        experiment_results["history"].append(epoch_record)
         
-        # Save weights depending on models used
+
+        print(f"\nEpoch {epoch+1} Results:")
+        print(f"Avg Loss: {avg_loss:.4f}")
+        print(f"BLEU-4:   {scores['bleu4']:.4f}")
+        print(f"METEOR:   {scores['meteor']:.4f}")
+        print(f"ROUGE-L:  {scores['rouge_rougeL_fmeasure']:.4f}")
+        
+        # --- Save weights and metrics  --- 
         checkpoint_dir = Path("checkpoints") / f"{args.vision_type}_{args.llm_model}_{args.caption_method}"
         checkpoint_dir.mkdir(parents=True, exist_ok=True)
+
+        # save weights
         save_path = checkpoint_dir / f"projector_epoch_{epoch+1}.pt"
         torch.save(model.projector.state_dict(), save_path)
 
-if __name__ == "__main__":
-    train()
+        if scores['bleu4'] > best_bleu:
+            best_bleu = scores['bleu4']
+            torch.save(model.projector.state_dict(), checkpoint_dir / "best_projector.pt")
+        
+        # update metrics file
+        with open(checkpoint_dir / "metrics.json", "w") as f:
+            json.dump(experiment_results, f, indent=4)
