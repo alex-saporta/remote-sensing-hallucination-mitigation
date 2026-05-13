@@ -10,7 +10,7 @@ sys.path.append(str(src_path))
 
 from data_loader import SecondCCDataset, precompute_merge_captions
 
-def test_dataloader(split="train", caption_method="random"):
+def test_dataloader(split="train", caption_method="random", merge_captions_path=None):
     print(f"Testing DataLoader with split='{split}' and caption_method='{caption_method}'...")
     
     # 1. Initialize dataset
@@ -20,7 +20,8 @@ def test_dataloader(split="train", caption_method="random"):
             data_root="data",
             llm_model="qwen2.5-3B",
             split=split,
-            caption_method=caption_method
+            caption_method=caption_method,
+            merge_captions_path=merge_captions_path
         )
     except Exception as e:
         print(f"Failed to load dataset: {e}")
