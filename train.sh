@@ -16,8 +16,8 @@ export TORCH_HOME="/data/dl4eo_p2g1/torch_cache"
 
 uv run python src/main.py \
     --mode train \
-    --vision_type RemoteCLIP \
-    --llm_model mistral-7b \
+    --vision_type GeoRSCLIP \
+    --llm_model qwen2.5-7B \
     --caption_method random \
     --batch_size 4 \
     --epochs 5 \
