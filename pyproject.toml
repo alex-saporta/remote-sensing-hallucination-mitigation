@@ -3,7 +3,7 @@ name = "project-2-team-1"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.9, <3.13"
 dependencies = [
     "accelerate>=1.10.1",
     "datasets>=4.5.0",
@@ -11,9 +11,9 @@ dependencies = [
     "open-clip-torch>=3.3.0",
     "peft>=0.17.1",
     "timm>=1.0.9",
-    "torch>=2.8.0",
+    "torch>=2.5.0",
     "torchmetrics[text]>=1.8.2",
-    "torchvision>=0.23.0",
+    "torchvision>=0.20.0",
     "transformers>=4.57.6",
 ]
 
