@@ -45,7 +45,9 @@ def eval_merge_quality(merge_json_path, original_json_path, output_file="merge_q
         f"Merged File:    {merge_path.name}",
         f"Samples:        {len(all_preds)}",
         f"BLEU-4:         {results.get('bleu4', 0.0):.4f}",
-        f"ROUGE-L:        {results.get('rouge_rougeL_fmeasure', 0.0):.4f}",
+        f"ROUGE-L:        {results.get('rougeL_fmeasure', 0.0):.4f}",
+        f"CIDEr:          {results.get('cider', 0.0):.4f}",
+        f"METEOR:         {results.get('meteor', 0.0):.4f}",
         "="*40
     ]
     
