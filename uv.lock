@@ -1364,7 +1364,7 @@ name = "nvidia-cudnn-cu11"
 version = "9.1.0.70"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "nvidia-cublas-cu11" },
+    { name = "nvidia-cublas-cu11", marker = "(python_full_version < '3.11' and sys_platform == 'emscripten') or (python_full_version < '3.11' and sys_platform == 'win32') or (sys_platform != 'emscripten' and sys_platform != 'win32')" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/00/3b/0b776f04e364cd99e4cf152c2a9eadb5934c67c9a91429da55169a9447fd/nvidia_cudnn_cu11-9.1.0.70-py3-none-manylinux2014_x86_64.whl", hash = "sha256:e6135ac63fe9d5b0b89cfb35c3fc1c1349f2b995becadf2e9dc21bca89d9633d", size = 663919573, upload-time = "2024-04-22T15:20:24.839Z" },
@@ -1393,7 +1393,7 @@ name = "nvidia-cusolver-cu11"
 version = "11.4.1.48"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "nvidia-cublas-cu11" },
+    { name = "nvidia-cublas-cu11", marker = "(python_full_version < '3.11' and sys_platform == 'emscripten') or (python_full_version < '3.11' and sys_platform == 'win32') or (sys_platform != 'emscripten' and sys_platform != 'win32')" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/55/ee/939ff0104991dd7bdabb4c9767994c612ba0e1c9a55672a1ddd42f5e5b16/nvidia_cusolver_cu11-11.4.1.48-py3-none-manylinux1_x86_64.whl", hash = "sha256:ca538f545645b7e6629140786d3127fe067b3d5a085bd794cde5bfe877c8926f", size = 128240842, upload-time = "2022-10-03T23:30:24.348Z" },
@@ -1734,6 +1734,7 @@ dependencies = [
     { name = "open-clip-torch" },
     { name = "peft", version = "0.17.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
     { name = "peft", version = "0.19.1", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.10'" },
+    { name = "pycocoevalcap" },
     { name = "timm" },
     { name = "torch" },
     { name = "torchmetrics", version = "1.8.2", source = { registry = "https://pypi.org/simple" }, extra = ["text"], marker = "python_full_version < '3.10'" },
@@ -1750,6 +1751,7 @@ requires-dist = [
     { name = "evaluate", specifier = ">=0.4.6" },
     { name = "open-clip-torch", specifier = ">=3.3.0" },
     { name = "peft", specifier = ">=0.17.1" },
+    { name = "pycocoevalcap", specifier = ">=1.2" },
     { name = "timm", specifier = ">=1.0.9" },
     { name = "torch", specifier = ">=2.5.0", index = "https://download.pytorch.org/whl/cu118" },
     { name = "torchmetrics", extras = ["text"], specifier = ">=1.8.2" },
@@ -1917,6 +1919,59 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/5f/e8/f88ce625fe8babaae64e8db2d417c7653adb3019b08aae85c5ed787dc816/pyarrow-24.0.0-cp312-cp312-musllinux_1_2_aarch64.whl", hash = "sha256:3b13dedfe76a0ad2d1d859b0811b53827a4e9d93a0bcb05cf59333ab4980cc7e", size = 49376032, upload-time = "2026-04-21T10:47:48.967Z" },
     { url = "https://files.pythonhosted.org/packages/36/7a/82c363caa145fff88fb475da50d3bf52bb024f61917be5424c3392eaf878/pyarrow-24.0.0-cp312-cp312-musllinux_1_2_x86_64.whl", hash = "sha256:25ea65d868eb04015cd18e6df2fbe98f07e5bda2abefabcb88fce39a947716f6", size = 51929490, upload-time = "2026-04-21T10:47:55.981Z" },
     { url = "https://files.pythonhosted.org/packages/66/1c/e3e72c8014ad2743ca64a701652c733cc5cbcee15c0463a32a8c55518d9e/pyarrow-24.0.0-cp312-cp312-win_amd64.whl", hash = "sha256:295f0a7f2e242dabd513737cf076007dc5b2d59237e3eca37b05c0c6446f3826", size = 27355660, upload-time = "2026-04-21T10:48:01.718Z" },
+]
+
+[[package]]
+name = "pycocoevalcap"
+version = "1.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pycocotools" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/ae/d7/6b77c7cddc3832ec4c551633c787aeeda168cc2e0ff173649ce145f1b85c/pycocoevalcap-1.2.tar.gz", hash = "sha256:7857f4d596ca2fa0b1a9a3c2067588a4257556077b7ad614d00b2b7b8f57cdde", size = 104309308, upload-time = "2020-11-18T12:03:42.138Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/08/f9/466f289f1628296b5e368940f89e3cfcfb066d15ddc02ff536dc532b1c93/pycocoevalcap-1.2-py3-none-any.whl", hash = "sha256:083ed7910f1aec000b0a237ef6665f74edf19954204d0b1cbdb8399ed132228d", size = 104312215, upload-time = "2020-11-18T11:56:23.026Z" },
+]
+
+[[package]]
+name = "pycocotools"
+version = "2.0.11"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy", version = "2.0.2", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
+    { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version == '3.10.*'" },
+    { name = "numpy", version = "2.4.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/a2/df/32354b5dda963ffdfc8f75c9acf8828ef7890723a4ed57bb3ff2dc1d6f7e/pycocotools-2.0.11.tar.gz", hash = "sha256:34254d76da85576fcaf5c1f3aa9aae16b8cb15418334ba4283b800796bd1993d", size = 25381, upload-time = "2025-12-15T22:31:46.148Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/dd/4b/0c040fcda2c4fa4827b1a64e3185d99d5f954e45cc9463ba7385a1173a77/pycocotools-2.0.11-cp310-cp310-macosx_10_9_universal2.whl", hash = "sha256:484d33515353186aadba9e2a290d81b107275cdb9565084e31a5568a52a0b120", size = 160351, upload-time = "2025-12-15T22:30:53.998Z" },
+    { url = "https://files.pythonhosted.org/packages/49/fe/861db6515824815eaabce27734653a6b100ddb22364b3345dd862b2c5b65/pycocotools-2.0.11-cp310-cp310-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:ca9f120f719ec405ad0c74ccfdb8402b0c37bd5f88ab5b6482a0de2efd5a36f4", size = 463947, upload-time = "2025-12-15T22:30:55.419Z" },
+    { url = "https://files.pythonhosted.org/packages/c5/a1/b4b49b85763043372e66baa10dffa42337cf4687d6db22546c27f3a4d732/pycocotools-2.0.11-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:e40a3a898c6e5340b8d70cf7984868b9bff8c3d80187de9a3b661d504d665978", size = 472455, upload-time = "2025-12-15T22:30:56.895Z" },
+    { url = "https://files.pythonhosted.org/packages/48/70/fac670296e6a2b45eb7434d0480b9af6cb85a8de4f4848b49b01154bc859/pycocotools-2.0.11-cp310-cp310-musllinux_1_2_aarch64.whl", hash = "sha256:7cd4cdfd2c676f30838aa0b1047441892fb4f97d70bf3df480bcc7a18a64d7d4", size = 457911, upload-time = "2025-12-15T22:30:58.377Z" },
+    { url = "https://files.pythonhosted.org/packages/33/f5/6158de63354dfcb677c8da34a4d205cc532e3277338ab7e6dea1310ba8de/pycocotools-2.0.11-cp310-cp310-musllinux_1_2_x86_64.whl", hash = "sha256:08c79789fd79e801ae4ecfcfeec32b31e36254e7a2b4019af28c104975d5e730", size = 476472, upload-time = "2025-12-15T22:30:59.736Z" },
+    { url = "https://files.pythonhosted.org/packages/fc/01/46d2a782cda19ba1beb7c431f417e1e478f0bf1273fa5fe5d10de7c18d76/pycocotools-2.0.11-cp310-cp310-win_amd64.whl", hash = "sha256:f78cbb1a32d061fcad4bdba083de70a39a21c1c3d9235a3f77d8f007541ec5ef", size = 80165, upload-time = "2025-12-15T22:31:00.886Z" },
+    { url = "https://files.pythonhosted.org/packages/ee/5c/6bd945781bb04c2148929183d1d67b05ce07996313b0f87bb88c6a805493/pycocotools-2.0.11-cp310-cp310-win_arm64.whl", hash = "sha256:e21311ea71f85591680d8992858e2d44a2a156dc3b2bf1c5c901c4a19348177b", size = 69358, upload-time = "2025-12-15T22:31:01.815Z" },
+    { url = "https://files.pythonhosted.org/packages/b3/3f/41ce3fce61b7721158f21b61727eb054805babc0088cfa48506935b80a36/pycocotools-2.0.11-cp311-cp311-macosx_10_9_universal2.whl", hash = "sha256:81bdceebb4c64e9265213e2d733808a12f9c18dfb14457323cc6b9af07fa0e61", size = 158947, upload-time = "2025-12-15T22:31:03.291Z" },
+    { url = "https://files.pythonhosted.org/packages/e2/9b/a739705b246445bd1376394bf9d1ec2dd292b16740e92f203461b2bb12ed/pycocotools-2.0.11-cp311-cp311-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:a1c05f91ccc658dfe01325267209c4b435da1722c93eeb5749fabc1d087b6882", size = 485174, upload-time = "2025-12-15T22:31:04.395Z" },
+    { url = "https://files.pythonhosted.org/packages/34/70/7a12752784e57d8034a76c245c618a2f88a9d2463862b990f314aea7e5d6/pycocotools-2.0.11-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:18ba75ff58cedb33a85ce2c18f1452f1fe20c9dd59925eec5300b2bf6205dbe1", size = 493172, upload-time = "2025-12-15T22:31:05.504Z" },
+    { url = "https://files.pythonhosted.org/packages/5c/fc/d703599ac728209dba08aea8d4bee884d5adabfcd9041abed1658d863747/pycocotools-2.0.11-cp311-cp311-musllinux_1_2_aarch64.whl", hash = "sha256:693417797f0377fd094eb815c0a1e7d1c3c0251b71e3b3779fce3b3cf24793c5", size = 480506, upload-time = "2025-12-15T22:31:06.77Z" },
+    { url = "https://files.pythonhosted.org/packages/81/d9/e1cfc320bbb2cd58c3b4398c3821cbe75d93c16ed3135ac9e774a18a02d3/pycocotools-2.0.11-cp311-cp311-musllinux_1_2_x86_64.whl", hash = "sha256:b6a07071c441d0f5e480a8f287106191582e40289d4e242dfe684e0c8a751088", size = 497595, upload-time = "2025-12-15T22:31:08.277Z" },
+    { url = "https://files.pythonhosted.org/packages/a2/23/d17f6111c2a6ae8631d4fa90202bea05844da715d61431fbc34d276462d5/pycocotools-2.0.11-cp311-cp311-win_amd64.whl", hash = "sha256:8e159232adae3aef6b4e2d37b008bff107b26e9ed3b48e70ea6482302834bd34", size = 80519, upload-time = "2025-12-15T22:31:09.613Z" },
+    { url = "https://files.pythonhosted.org/packages/00/4c/76b00b31a724c3f5ccdab0f85e578afb2ca38d33be0a0e98f1770cafd958/pycocotools-2.0.11-cp311-cp311-win_arm64.whl", hash = "sha256:4fc9889e819452b9c142036e1eabac8a13a8bd552d8beba299a57e0da6bfa1ec", size = 69304, upload-time = "2025-12-15T22:31:10.592Z" },
+    { url = "https://files.pythonhosted.org/packages/87/12/2f2292332456e4e4aba1dec0e3de8f1fc40fb2f4fdb0ca1cb17db9861682/pycocotools-2.0.11-cp312-abi3-macosx_10_13_universal2.whl", hash = "sha256:a2e9634bc7cadfb01c88e0b98589aaf0bd12983c7927bde93f19c0103e5441f4", size = 147795, upload-time = "2025-12-15T22:31:11.519Z" },
+    { url = "https://files.pythonhosted.org/packages/63/3c/68d7ea376aada9046e7ea2d7d0dad0d27e1ae8b4b3c26a28346689390ab2/pycocotools-2.0.11-cp312-abi3-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:7fd4121766cc057133534679c0ec3f9023dbd96e9b31cf95c86a069ebdac2b65", size = 398434, upload-time = "2025-12-15T22:31:12.558Z" },
+    { url = "https://files.pythonhosted.org/packages/23/59/dc81895beff4e1207a829d40d442ea87cefaac9f6499151965f05c479619/pycocotools-2.0.11-cp312-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:a82d1c9ed83f75da0b3f244f2a3cf559351a283307bd9b79a4ee2b93ab3231dd", size = 411685, upload-time = "2025-12-15T22:31:13.995Z" },
+    { url = "https://files.pythonhosted.org/packages/0b/0b/5a8a7de300862a2eb5e2ecd3cb015126231379206cd3ebba8f025388d770/pycocotools-2.0.11-cp312-abi3-musllinux_1_2_aarch64.whl", hash = "sha256:89e853425018e2c2920ee0f2112cf7c140a1dcf5f4f49abd9c2da112c3e0f4b3", size = 390500, upload-time = "2025-12-15T22:31:15.138Z" },
+    { url = "https://files.pythonhosted.org/packages/63/b5/519bb68647f06feea03d5f355c33c05800aeae4e57b9482b2859eb00752e/pycocotools-2.0.11-cp312-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:87af87b8d06d5b852a885a319d9362dca3bed9f8bbcc3feb6513acb1f88ea242", size = 409790, upload-time = "2025-12-15T22:31:16.326Z" },
+    { url = "https://files.pythonhosted.org/packages/83/b4/f6708404ff494706b80e714b919f76dc4ec9845a4007affd6d6b0843f928/pycocotools-2.0.11-cp312-abi3-win_amd64.whl", hash = "sha256:ffe806ce535f5996445188f9a35643791dc54beabc61bd81e2b03367356d604f", size = 77570, upload-time = "2025-12-15T22:31:17.703Z" },
+    { url = "https://files.pythonhosted.org/packages/6e/63/778cd0ddc9d4a78915ac0a72b56d7fb204f7c3fabdad067d67ea0089762e/pycocotools-2.0.11-cp312-abi3-win_arm64.whl", hash = "sha256:c230f5e7b14bd19085217b4f40bba81bf14a182b150b8e9fab1c15d504ade343", size = 64564, upload-time = "2025-12-15T22:31:18.652Z" },
+    { url = "https://files.pythonhosted.org/packages/fa/8a/e005c50aef072bb3800b8f38d77dd6d9a08f91efb17b65cffa7e8eaa3abc/pycocotools-2.0.11-cp39-cp39-macosx_10_9_universal2.whl", hash = "sha256:9dc8b388984c72aa84b1a68933f196ce71ab114c59232d0eab20c97cc1300875", size = 161170, upload-time = "2025-12-15T22:31:38.08Z" },
+    { url = "https://files.pythonhosted.org/packages/04/59/d14d3adcf0dbe63774d80717bf865fc3b77822ed41ab7ae308c48192024d/pycocotools-2.0.11-cp39-cp39-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:a2b018497ec198ffc737dd7e6306a2e69999779ca619a9e12950e4506e410c3e", size = 461544, upload-time = "2025-12-15T22:31:39.151Z" },
+    { url = "https://files.pythonhosted.org/packages/8c/3c/a617217c3a5d8313ea656ded7f38ae34f78ad95be44bba12890faf389c6b/pycocotools-2.0.11-cp39-cp39-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:e72527fdc00985d29dbe31d17b19cd2d16fbad7b01e974c567b593d5844de710", size = 470263, upload-time = "2025-12-15T22:31:40.429Z" },
+    { url = "https://files.pythonhosted.org/packages/60/04/cc6dd61b27c58bed41fc0efc08e1405147c9146542b5955db5915a52a0e9/pycocotools-2.0.11-cp39-cp39-musllinux_1_2_aarch64.whl", hash = "sha256:d6b88557166794a24acd03f50296f2b95adf3e4206b4b8995e6bdca925c9cb72", size = 456222, upload-time = "2025-12-15T22:31:41.576Z" },
+    { url = "https://files.pythonhosted.org/packages/21/6f/7db99a9faae1d1fa8ad9b9ca528b1144e76c849eb5c037bb0f8bda665320/pycocotools-2.0.11-cp39-cp39-musllinux_1_2_x86_64.whl", hash = "sha256:6a2f4f036f5bfdaf8c9625279051e921721fc9d27f92c97a3f3355a07ba38513", size = 475143, upload-time = "2025-12-15T22:31:42.822Z" },
+    { url = "https://files.pythonhosted.org/packages/ea/64/7e3023ee979ce6619c053c3c852aafea6f8448d67c9b047f9233ce179cd0/pycocotools-2.0.11-cp39-cp39-win_amd64.whl", hash = "sha256:eba35d6e06caaea28ce65a4b92e4343ecbb9abf4915f7ef7fca989b80839111c", size = 80520, upload-time = "2025-12-15T22:31:44.216Z" },
+    { url = "https://files.pythonhosted.org/packages/d8/8b/f2a7a8fbae6bef8ea12428ecca6c208366a3ba79b2b76812cd6853f10f1b/pycocotools-2.0.11-cp39-cp39-win_arm64.whl", hash = "sha256:1192de413a23b4b94199197e8f8dbe1277cc24e6e9847bee6a71be3d8e543963", size = 69573, upload-time = "2025-12-15T22:31:45.189Z" },
 ]
 
 [[package]]
@@ -2552,7 +2607,7 @@ name = "triton"
 version = "3.3.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "setuptools" },
+    { name = "setuptools", marker = "(python_full_version < '3.11' and sys_platform == 'emscripten') or (python_full_version < '3.11' and sys_platform == 'win32') or (sys_platform != 'emscripten' and sys_platform != 'win32')" },
 ]
 wheels = [
     { url = "https://files.pythonhosted.org/packages/8d/a9/549e51e9b1b2c9b854fd761a1d23df0ba2fbc60bd0c13b489ffa518cfcb7/triton-3.3.1-cp310-cp310-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:b74db445b1c562844d3cfad6e9679c72e93fdfb1a90a24052b03bb5c49d1242e", size = 155600257, upload-time = "2025-05-29T23:39:36.085Z" },
