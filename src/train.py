@@ -134,16 +134,20 @@ def train(args):
         epoch_record = {
             "epoch": epoch + 1,
             "loss": avg_loss,
-            "bleu4": scores['bleu4'],
-            "rougeL": scores['rouge_rougeL_fmeasure']
+            "bleu4": scores.get('bleu4', 0.0),
+            "rougeL": scores.get('rougeL_fmeasure', 0.0),
+            "cider": scores.get('cider', 0.0),
+            "meteor": scores.get('meteor', 0.0)
         }
         experiment_results["history"].append(epoch_record)
         
 
         print(f"\nEpoch {epoch+1} Results:")
         print(f"Avg Loss: {avg_loss:.4f}")
-        print(f"BLEU-4:   {scores['bleu4']:.4f}")
-        print(f"ROUGE-L:  {scores['rouge_rougeL_fmeasure']:.4f}")
+        print(f"BLEU-4:   {scores.get('bleu4', 0.0):.4f}")
+        print(f"ROUGE-L:  {scores.get('rougeL_fmeasure', 0.0):.4f}")
+        print(f"CIDEr:    {scores.get('cider', 0.0):.4f}")
+        print(f"METEOR:   {scores.get('meteor', 0.0):.4f}")
         
         # --- Save weights and metrics  --- 
         #checkpoint_dir = Path("checkpoints") / f"{args.vision_type}_{args.llm_model}_{args.caption_method}"
