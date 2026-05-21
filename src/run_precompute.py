@@ -1,4 +1,4 @@
-from src.data_loader import precompute_merge_captions
+from data_loader import precompute_merge_captions
 
 print("Starting caption merging...")
 precompute_merge_captions(

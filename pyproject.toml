@@ -27,3 +27,9 @@ explicit = true
 [tool.uv.sources]
 torch = { index = "pytorch-cu118", marker = "sys_platform == 'linux'" }
 torchvision = { index = "pytorch-cu118", marker = "sys_platform == 'linux'" }
+
+[dependency-groups]
+dev = [
+    "matplotlib>=3.9.4",
+    "seaborn>=0.13.2",
+]

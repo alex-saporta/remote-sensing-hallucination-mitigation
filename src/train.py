@@ -109,21 +109,16 @@ def train(args):
         all_targets = []
         print("Calculating quality metrics...")
         # Only validate on a small number of samples to save time
-        num_val_samples = 50 
         print(f"Generating captions for validation...")
 
         with torch.no_grad():
-            for i, val_batch in enumerate(val_loader):
-                if i >= num_val_samples: break
-                
-                # TODO : check if correct generate call
+            for val_batch in tqdm(val_loader, desc=f"Epoch {epoch+1} [Val]"):
                 pred_caption = model.generate(
                     val_batch['pixel_values_a'].to(device),
                     val_batch['pixel_values_b'].to(device),
                     tokenizer=train_dataset.tokenizer,
                     device=device
                 )
-                
                 all_preds.append(pred_caption)
                 all_targets.append(val_batch['raw_caption'][0])
 
