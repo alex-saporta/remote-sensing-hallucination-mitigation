@@ -18,7 +18,8 @@ uv run python src/main.py \
     --mode train \
     --vision_type GeoRSCLIP \
     --llm_model qwen2.5-7B \
-    --caption_method random \
+    --caption_method merge \
+    --merge_captions_path "data/merged_captions_qwen.json" \
     --batch_size 4 \
     --epochs 5 \
     --lr 1e-4
