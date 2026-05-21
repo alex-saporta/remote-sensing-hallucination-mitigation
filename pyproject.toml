@@ -1,7 +1,7 @@
 [project]
 name = "project-2-team-1"
 version = "0.1.0"
-description = "Add your description here"
+description = "Bi-temporal VLM for change captionning on remote sensing images"
 readme = "README.md"
 requires-python = ">=3.9, <3.13"
 dependencies = [
@@ -25,5 +25,5 @@ url = "https://download.pytorch.org/whl/cu118"
 explicit = true
 
 [tool.uv.sources]
-torch = { index = "pytorch-cu118" }
-torchvision = { index = "pytorch-cu118" }
+torch = { index = "pytorch-cu118", marker = "sys_platform == 'linux'" }
+torchvision = { index = "pytorch-cu118", marker = "sys_platform == 'linux'" }
