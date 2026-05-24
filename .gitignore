@@ -1,9 +1,7 @@
 .venv/
 __pycache__/
 .DS_Store
-data/*
-!data/.gitkeep
-!data/merged-SECOND-CC.json
+data
 logs/
 train.sh
 evaluate_merged_captions.sh
