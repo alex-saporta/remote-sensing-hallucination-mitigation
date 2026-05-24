@@ -3,6 +3,8 @@ __pycache__/
 .DS_Store
 data/*
 !data/.gitkeep
+!data/merged-SECOND-CC.json
 logs/
 train.sh
 evaluate_merged_captions.sh
+merge_captions.sh
