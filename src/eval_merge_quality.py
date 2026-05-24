@@ -2,6 +2,7 @@ import json
 import torch
 from pathlib import Path
 from utils.metrics import Metrics
+import argparse
 
 def eval_merge_quality(merge_json_path, original_json_path, output_file="merge_quality_results.txt"):
     """
@@ -58,3 +59,47 @@ def eval_merge_quality(merge_json_path, original_json_path, output_file="merge_q
     
     print(f"Merge quality evaluation saved to: {output_file}")
     return results
+    pass
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Évalue la qualité des captions mergées.")
+    
+    parser.add_argument(
+        "--merge_file", 
+        type=str, 
+        required=True, 
+        help="Chemin vers le fichier JSON des captions générées/mergées."
+    )
+    parser.add_argument(
+        "--ref_file", 
+        type=str, 
+        required=True, 
+        help="Chemin vers le fichier JSON original contenant les références."
+    )
+    parser.add_argument(
+        "--output_dir", 
+        type=str, 
+        required=True, 
+        help="Dossier de destination pour sauvegarder les résultats."
+    )
+
+    args = parser.parse_args()
+
+    # 1. S'assurer que le dossier de sortie existe, sinon le créer
+    out_dir = Path(args.output_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    # 2. Définir le chemin complet du fichier de résultats
+    output_file_path = out_dir / "merge_quality_results.txt"
+
+    # 3. Lancer l'évaluation
+    print("Début de l'évaluation des métriques...")
+    results = eval_merge_quality(
+        merge_json_path=args.merge_file,
+        original_json_path=args.ref_file,
+        output_file=str(output_file_path)
+    )
+    
+    if isinstance(results, str):
+        # Si la fonction retourne un string, c'est qu'elle a rencontré une erreur (comme défini dans ton code)
+        print(results)

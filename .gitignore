@@ -3,3 +3,6 @@ __pycache__/
 .DS_Store
 data/*
 !data/.gitkeep
+logs/
+train.sh
+evaluate_merged_captions.sh
