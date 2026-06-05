@@ -27,7 +27,7 @@ def train(args):
         fusion_type=args.fusion_type, 
         llm_model=args.llm_model, 
         vision_type=args.vision_type,
-        prompt=args.llm_prompt
+        prompt=args.prompt
     )
     model.to(device)
     evaluator = Metrics(device)
