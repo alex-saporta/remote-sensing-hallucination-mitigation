@@ -18,7 +18,7 @@ def test_dataloader(split="train", caption_method="random", merge_captions_path=
         dataset = SecondCCDataset(
             json_path="data/SECOND-CC-AUG.json", 
             data_root="data",
-            llm_model="qwen2.5-3B",
+            llm_model="qwen2.5-7B",
             split=split,
             caption_method=caption_method,
             merge_captions_path=merge_captions_path

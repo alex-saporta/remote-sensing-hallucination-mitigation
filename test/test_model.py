@@ -63,13 +63,13 @@ if __name__ == "__main__":
     parser.add_argument(
         "--llm", 
         type=str, 
-        default="qwen2.5-3B", 
+        default="qwen2.5-7B", 
         help="The LLM model to use (e.g., qwen2.5-3B, qwen2.5-7B, vicuna-7b)"
     )
     parser.add_argument(
         "--vlm",
         type=str,
-        default="standard",
+        default="GeoRSCLIP",
         help="The vision model to use (e.g., RemoteCLIP, SkyCLIP, GeoRSCLIP, standard)"
     )
 

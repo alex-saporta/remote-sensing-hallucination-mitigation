@@ -9,6 +9,7 @@ import os
 from data_loader import SecondCCDataset 
 from model import VLM 
 from utils.metrics import Metrics
+from transformers import get_cosine_schedule_with_warmup
 
 def train(args):
     # 1. Setup depends on device type
@@ -23,9 +24,10 @@ def train(args):
 
     # 2. Initialize model
     model = VLM(
-        fusion_type="concat", 
+        fusion_type=args.fusion_type, 
         llm_model=args.llm_model, 
-        vision_type=args.vision_type
+        vision_type=args.vision_type,
+        prompt=args.llm_prompt
     )
     model.to(device)
     evaluator = Metrics(device)
@@ -34,13 +36,15 @@ def train(args):
     # 3. Data preparation
     current_dir = Path(__file__).resolve().parent
     project_root = current_dir.parent
+    
     train_dataset = SecondCCDataset(
         json_path= project_root / "data" / "SECOND-CC-AUG.json", 
         data_root=project_root / "data", 
         llm_model=args.llm_model,
         split="train",
         caption_method=args.caption_method,
-        merge_captions_path=args.merge_captions_path
+        merge_captions_path=args.merge_captions_path,
+        llm_prompt=args.prompt
     )
     train_loader = DataLoader(
         train_dataset, 
@@ -53,20 +57,38 @@ def train(args):
         data_root=project_root / "data",
         llm_model=args.llm_model,
         split="val", 
-        caption_method="one", # Use a fixed caption for consistent evaluation
+        caption_method=args.caption_method,
+        merge_captions_path=args.merge_captions_path,
+        llm_prompt=args.prompt
     )
     val_loader = DataLoader(val_dataset, batch_size=1, shuffle=False)
 
     optimizer = optim.AdamW(model.projector.parameters(), lr=args.lr)
 
-    # 4. Prepare evaluator
+    # 4. Initialize dynamic learning rate
+    total_steps = len(train_loader) * args.epochs
+    warmup_steps = int(0.1 * total_steps)
+    scheduler = get_cosine_schedule_with_warmup(
+        optimizer,
+        num_warmup_steps=warmup_steps,
+        num_training_steps=total_steps
+    )
+
+    # 5. Prepare evaluator
     experiment_results = {
         "config": vars(args), # save command line args
         "history": [] # store metrics for every epoch
     }
     best_bleu = -1.0
 
-    # 5. Training loop
+    # 6. Save the experiment setup/arguments
+    checkpoint_dir = project_root / "data" / "checkpoints" / f"{args.caption_method}_{args.vision_type}_{args.fusion_type}_{args.llm_model}"
+    checkpoint_dir.mkdir(parents=True, exist_ok=True)
+    config_path = checkpoint_dir / "setup_args.json" 
+    with open(config_path, "w") as f:
+            json.dump(vars(args), f, indent=4)
+
+    # 7. Training loop
     for epoch in range(args.epochs):
         # ----- Training Phase ------
         model.train()
@@ -100,6 +122,7 @@ def train(args):
             loss = outputs.loss
             loss.backward()
             optimizer.step()
+            scheduler.step()
             
             epoch_loss += loss.item()
             pbar.set_postfix(loss=loss.item())  
@@ -108,19 +131,29 @@ def train(args):
         all_preds = []
         all_targets = []
         print("Calculating quality metrics...")
-        # Only validate on a small number of samples to save time
-        print(f"Generating captions for validation...")
+        print(f"Generating captions for validation (MARINE active: {args.marine})...")
 
         with torch.no_grad():
             for val_batch in tqdm(val_loader, desc=f"Epoch {epoch+1} [Val]"):
-                pred_caption = model.generate(
-                    val_batch['pixel_values_a'].to(device),
-                    val_batch['pixel_values_b'].to(device),
-                    tokenizer=train_dataset.tokenizer,
-                    device=device
-                )
+                if args.marine :
+                    pred_caption = model.generate_marine(
+                        pixel_values_a=val_batch['pixel_values_a'].to(device),
+                        pixel_values_b=val_batch['pixel_values_b'].to(device),
+                        input_ids_base=val_batch['input_ids_base'].to(device),
+                        input_ids_guided=val_batch['input_ids_guided'].to(device),
+                        tokenizer=val_dataset.tokenizer,
+                        guidance_strength=args.guidance_strength,
+                        device=device
+                    )
+                else :
+                    pred_caption = model.generate(
+                        val_batch['pixel_values_a'].to(device),
+                        val_batch['pixel_values_b'].to(device),
+                        tokenizer=val_dataset.tokenizer,
+                        device=device
+                    )
                 all_preds.append(pred_caption)
-                all_targets.append(val_batch['raw_caption'][0])
+                all_targets.append([val_batch['raw_caption'][0]])
 
         # Evaluate the captions
         scores = evaluator.compute_caption_quality(all_preds, all_targets)
@@ -144,12 +177,9 @@ def train(args):
         print(f"CIDEr:    {scores.get('cider', 0.0):.4f}")
         print(f"METEOR:   {scores.get('meteor', 0.0):.4f}")
         
-        # --- Save weights and metrics  --- 
-        #checkpoint_dir = Path("checkpoints") / f"{args.vision_type}_{args.llm_model}_{args.caption_method}"
-        checkpoint_dir = project_root / "data" / "checkpoints" / f"{args.vision_type}_{args.llm_model}_{args.caption_method}"
-        checkpoint_dir.mkdir(parents=True, exist_ok=True)
-
-        # save weights
+        # 8. Save weights, metrics and captions
+        
+        # Weights
         save_path = checkpoint_dir / f"projector_epoch_{epoch+1}.pt"
         torch.save(model.projector.state_dict(), save_path)
 
@@ -157,6 +187,19 @@ def train(args):
             best_bleu = scores['bleu4']
             torch.save(model.projector.state_dict(), checkpoint_dir / "best_projector.pt")
         
-        # update metrics file
+        # Metrics file
         with open(checkpoint_dir / "metrics.json", "w") as f:
             json.dump(experiment_results, f, indent=4)
+
+        # Generated captions for this epoch
+        epoch_predictions = []
+        for i in range(len(all_preds)):
+            epoch_predictions.append({
+                "sample_index": i,
+                "ground_truth": all_targets[i][0],
+                "generated_caption": all_preds[i]
+            })
+            
+        preds_save_path = checkpoint_dir / f"predictions_epoch_{epoch+1}.json"
+        with open(preds_save_path, "w") as f:
+            json.dump(epoch_predictions, f, indent=4)

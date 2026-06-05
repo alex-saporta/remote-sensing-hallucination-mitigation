@@ -17,7 +17,7 @@ def test_training_loop():
     # 1. Setup arguments
     parser = argparse.ArgumentParser(description="Test script for modular VLM training")
     parser.add_argument("--vision_type", type=str, default="GeoRSCLIP", choices=['RemoteCLIP', 'SkyCLIP', 'standard'])
-    parser.add_argument("--llm_model", type=str, default="mistral-7b", choices=['qwen2.5-3B', 'qwen2.5-7B', 'vicuna-7b'])
+    parser.add_argument("--llm_model", type=str, default="qwen2.5-7B", choices=['qwen2.5-7B', 'vicuna-7b'])
     parser.add_argument("--caption_method", type=str, default="random")
     args = parser.parse_args()
 

@@ -62,8 +62,10 @@ class SecondCCDataset(Dataset):
     Dataset for Remote Sensing Change Captioning.
     Links two satellite images (Time 1 and Time 2) to a change description.
     """
-    def __init__(self, json_path, data_root, llm_model="qwen2.5-3B", split="train", 
-                max_length=128, caption_method="random", merge_captions_path=None):
+    def __init__(self, json_path, data_root, llm_model="qwen2.5-7B", split="train", 
+                max_length=128, caption_method="random", merge_captions_path=None, 
+                llm_prompt="Describe the changes between the first image and the second image.",
+                tags_cache_name="marine_tags.json"):
         """
         Args:
             json_path: Path to the SECOND-CC-AUG.json file.
@@ -73,10 +75,14 @@ class SecondCCDataset(Dataset):
             max_length: Maximum sentence length for the LLM.
             caption_method: Method for selecting captions ('random', 'one', 'five').
             merge_captions_path: Path to the pre-computed merge captions JSON (required if caption_method='merge').
+            llm_prompt : Prompt given to the LLM to perform the task
+            tags_cache_name : Name of the file containing the tags for the images
         """
         self.data_root = Path(data_root) / split
         self.max_length = max_length
         self.caption_method = caption_method
+        self.llm_prompt = llm_prompt
+        self.split = split
         
         # 1. Initialize tools
         llm_registry = {
@@ -111,6 +117,17 @@ class SecondCCDataset(Dataset):
             print(f"Loaded pre-computed merge captions from: {merge_captions_path}")
         else:
             self.merge_captions = None
+
+        # Load the pre-computed tags
+        project_root = Path(json_path).resolve().parent.parent
+        tags_json_path = project_root / "data" / tags_cache_name
+        if tags_json_path.exists():
+            print(f"[{split.upper()}] Loading visual guidance tags cache: {tags_json_path}")
+            with open(tags_json_path, "r") as f:
+                self.tag_cache = json.load(f)
+        else:
+            print(f"WARNING: Guidance cache missing at {tags_json_path}. Falling back to default baseline configurations.")
+            self.tag_cache = {}
                                                                
         # 2. Parse the JSON structure
         with open(json_path, 'r') as f:
@@ -144,27 +161,24 @@ class SecondCCDataset(Dataset):
         img_a = Image.open(path_a).convert("RGB")
         img_b = Image.open(path_b).convert("RGB")
         
-        # 4. Prepare Images : we process both as a list to ensure identical treatment
+        # 4. Prepare images : we process both as a list to ensure identical treatment
         vis_inputs = self.vision_processor(images=[img_a, img_b], return_tensors="pt")
         
-        # 5. Prepare Text
-        prompt = "Describe the change between these two satellite images: "
         sentences = sample['sentences']
+       
         # Map string numbers to their corresponding list index
         index_map = {"one": 0, "two": 1, "three": 2, "four": 3, "five": 4}
-        
         if self.caption_method in index_map:
-            # Get the requested index
             target_idx = index_map[self.caption_method]
-            # Safety check: ensure we don't go out of bounds if a sample has fewer than 5 captions
             safe_idx = min(target_idx, len(sentences) - 1)
             caption = sentences[safe_idx]['raw']
-            
+
+        # Randomly select one of the available captions    
         elif self.caption_method == "random":
-            # Randomly select one of the available captions
             caption_idx = random.randint(0, len(sentences) - 1)
             caption = sentences[caption_idx]['raw']
-            
+        
+        # Select the caption from the merged file
         elif self.caption_method == "merge":
             caption = self.merge_captions.get(img_name)
             if caption is None:
@@ -177,8 +191,9 @@ class SecondCCDataset(Dataset):
             valid_methods = list(index_map.keys()) + ["random", "merge"]
             raise ValueError(f"Unknown caption_method: '{self.caption_method}'. Use one of: {valid_methods}")
         
+        # 5. Handle visual + text tokens fusion
         # Combine with prompt and end of sentence token
-        full_text = f"{prompt}{caption}{self.tokenizer.eos_token}"
+        full_text = f"{self.llm_prompt}{caption}{self.tokenizer.eos_token}"
         
         text_inputs = self.tokenizer(
             full_text,
@@ -187,9 +202,23 @@ class SecondCCDataset(Dataset):
             max_length=self.max_length,
             return_tensors="pt"
         )
-
         # Calculate prompt length for label masking later
-        prompt_len = len(self.tokenizer(prompt, add_special_tokens=True)["input_ids"])
+        prompt_len = len(self.tokenizer(self.llm_prompt, add_special_tokens=True)["input_ids"])
+        
+        # 6. MARINE 
+        # Fetch pre-computed tags
+        if img_name in self.tag_cache:
+            tags_a_str = ", ".join(self.tag_cache[img_name]["A"]) if self.tag_cache[img_name]["A"] else "no features"
+            tags_b_str = ", ".join(self.tag_cache[img_name]["B"]) if self.tag_cache[img_name]["B"] else "no features"
+        else:
+            tags_a_str, tags_b_str = "unknown features", "unknown features"
+
+        # Construct the contrastive companion prompt string
+        guided_prompt_str = f"Context: Time A shows {tags_a_str}. Time B shows {tags_b_str}. {self.llm_prompt}"
+        
+        # Tokenize prompt token inputs cleanly for validation generation trackers
+        input_ids_base = self.tokenizer(self.llm_prompt, return_tensors="pt")["input_ids"].squeeze(0)
+        input_ids_guided = self.tokenizer(guided_prompt_str, return_tensors="pt")["input_ids"].squeeze(0)
 
         return {
             "image_id": img_name,
@@ -198,6 +227,8 @@ class SecondCCDataset(Dataset):
             "input_ids": text_inputs['input_ids'].squeeze(),
             "attention_mask": text_inputs['attention_mask'].squeeze(),
             "prompt_len": prompt_len,
-            "raw_caption": caption
+            "raw_caption": caption,
+            "input_ids_base": input_ids_base,
+            "input_ids_guided": input_ids_guided
         }
        

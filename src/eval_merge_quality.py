@@ -62,38 +62,37 @@ def eval_merge_quality(merge_json_path, original_json_path, output_file="merge_q
     pass
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Évalue la qualité des captions mergées.")
-    
+    # 1. Setup arguments
+    parser = argparse.ArgumentParser(description="Evaluates the quality of the merged captions.")
     parser.add_argument(
         "--merge_file", 
         type=str, 
         required=True, 
-        help="Chemin vers le fichier JSON des captions générées/mergées."
+        help="Path to the JSON file of generated captions"
     )
     parser.add_argument(
         "--ref_file", 
         type=str, 
         required=True, 
-        help="Chemin vers le fichier JSON original contenant les références."
+        help="Path to the JSON file containing the original captions."
     )
     parser.add_argument(
         "--output_dir", 
         type=str, 
         required=True, 
-        help="Dossier de destination pour sauvegarder les résultats."
+        help="Destination directory to save results."
     )
-
     args = parser.parse_args()
 
-    # 1. S'assurer que le dossier de sortie existe, sinon le créer
+    # 2. Ensure directory exists, otherwise create it
     out_dir = Path(args.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    # 2. Définir le chemin complet du fichier de résultats
+    # 3. Define complete output path for results
     output_file_path = out_dir / "merge_quality_results.txt"
 
-    # 3. Lancer l'évaluation
-    print("Début de l'évaluation des métriques...")
+    # 4. Launch evaluation 
+    print("Starting merged captions evaluation ...")
     results = eval_merge_quality(
         merge_json_path=args.merge_file,
         original_json_path=args.ref_file,
@@ -101,5 +100,4 @@ if __name__ == "__main__":
     )
     
     if isinstance(results, str):
-        # Si la fonction retourne un string, c'est qu'elle a rencontré une erreur (comme défini dans ton code)
         print(results)

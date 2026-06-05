@@ -18,22 +18,22 @@ class Projector(nn.Module):
         return self.model(x)
 
 class VLM(nn.Module):
-    def __init__(self, fusion_type="concat", llm_model="qwen2.5-3B", vision_type="standard"):
+    def __init__(self, fusion_type="concat", llm_model="qwen2.5-7B", vision_type="standard", 
+                 prompt="Describe the change between these two satellite images in one sentence."):
         super().__init__()
         self.fusion_type = fusion_type
+        self.prompt = prompt
 
-        # ViT-L-14 is the default backbone; swap here to try other OpenCLIP variants
+        # 1. Vision Encoder : ViT-L-14 is the default; swap here to try other OpenCLIP variants
         model_name = "ViT-L-14"
-
-        # 1. Vision Encoder
-        print("Loading Vision Encoder architecture via OpenCLIP")
+        print("Loading Vision Encoder architecture...")
         self.vision_encoder = self._load_vision_encoder(vision_type, model_name)
         vision_out_dim = getattr(self.vision_encoder, "output_dim", 768)
 
-        # 2. Projector
-        # Concatenation fusion doubles the input dimension to the projector
+        # 2. Projector : concatenation fusion doubles the input dimension to the projector
         self.proj_in_dim = vision_out_dim * 2 if fusion_type == "concat" else vision_out_dim
 
+        # 3. LLM
         llm_registry = {
             "qwen2.5-7B": "Qwen/Qwen2.5-7B",
             "vicuna-7b":  "lmsys/vicuna-7b-v1.5",
@@ -53,7 +53,6 @@ class VLM(nn.Module):
 
         self.projector = Projector(vision_dim=self.proj_in_dim, llm_dim=llm_dim)
 
-        # 3. LLM
         print(f"Loading LLM: {hf_model_id}")
         self.language_model = AutoModelForCausalLM.from_pretrained(
             hf_model_id,
@@ -62,15 +61,14 @@ class VLM(nn.Module):
             low_cpu_mem_usage=True,
         )
 
-        # Freeze vision encoder and LLM — only the projector is trained
+        # Freeze vision encoder and LLM, only the projector is trained
         for param in self.vision_encoder.parameters():
             param.requires_grad = False
         for param in self.language_model.parameters():
             param.requires_grad = False
 
 
-    # Vision-encoder factory (extracted from __init__ for readability)
-
+    # Vision-encoder factory
     def _load_vision_encoder(self, vision_type: str, model_name: str):
         """Instantiate and return the requested vision encoder."""
 
@@ -226,6 +224,7 @@ class VLM(nn.Module):
             """
             Inference method to generate a caption for a given image pair.
             """
+            self.eval()
             # 1. Encode and fusion images
             with torch.no_grad():
                 feat_a = self.vision_encoder(pixel_values_a.to(device))
@@ -237,12 +236,11 @@ class VLM(nn.Module):
                     fused_feat = feat_b - feat_a
 
                 # 2. Project to LLM space
-                visual_embeds = self.projector(fused_feat).unsqueeze(1) # [Batch, 1, llm_dim]
+                visual_embeds = self.projector(fused_feat).unsqueeze(1)
                 visual_embeds = visual_embeds.to(self.language_model.dtype)
 
-                # 3. Prepare the Prompt
-                prompt = "Describe the change between these two satellite images: "
-                input_ids = tokenizer(prompt, return_tensors="pt").input_ids.to(device)
+                # 3. Prepare the prompt
+                input_ids = tokenizer(self.prompt, return_tensors="pt").input_ids.to(device)
                 text_embeds = self.language_model.get_input_embeddings()(input_ids)
 
                 # 4. Concatenate visual prefix with prompt
@@ -263,3 +261,10 @@ class VLM(nn.Module):
                 caption = tokenizer.decode(output_ids[0], skip_special_tokens=True)
                 
                 return caption.strip()
+    
+    @torch.no_grad()
+    def generate_marine():
+        """
+        Inference method to generate captions using Image Grounded Guidance (MARINE).
+        """
+        pass
