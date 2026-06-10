@@ -81,14 +81,7 @@ def train(args):
     }
     best_bleu = -1.0
 
-    # 6. Save the experiment setup/arguments
-    checkpoint_dir = project_root / "data" / "checkpoints" / f"{args.caption_method}_{args.vision_type}_{args.fusion_type}_{args.llm_model}"
-    checkpoint_dir.mkdir(parents=True, exist_ok=True)
-    config_path = checkpoint_dir / "setup_args.json" 
-    with open(config_path, "w") as f:
-            json.dump(vars(args), f, indent=4)
-
-    # 7. Training loop
+    # 6. Training loop
     for epoch in range(args.epochs):
         # ----- Training Phase ------
         model.train()
@@ -127,10 +120,9 @@ def train(args):
             epoch_loss += loss.item()
             pbar.set_postfix(loss=loss.item())  
         # ---- Evaluation phase -----
-        model.eval()
         all_preds = []
         all_targets = []
-        print("Calculating quality metrics...")
+        print("\nCalculating quality metrics...")
         print(f"Generating captions for validation (MARINE active: {args.marine})...")
 
         with torch.no_grad():
@@ -145,6 +137,8 @@ def train(args):
                         guidance_strength=args.guidance_strength,
                         device=device
                     )
+                    all_preds.append(pred_caption)
+                    all_targets.append([val_batch['raw_caption'][0]])
                 else :
                     pred_caption = model.generate(
                         val_batch['pixel_values_a'].to(device),
@@ -152,10 +146,11 @@ def train(args):
                         tokenizer=val_dataset.tokenizer,
                         device=device
                     )
-                all_preds.append(pred_caption)
-                all_targets.append([val_batch['raw_caption'][0]])
+                    all_preds.append(pred_caption)
+                    all_targets.append([val_batch['raw_caption'][0]])
 
-        # Evaluate the captions
+
+        # Evaluate captions
         scores = evaluator.compute_caption_quality(all_preds, all_targets)
         evaluator.reset()
         avg_loss = epoch_loss / len(train_loader)
@@ -177,7 +172,9 @@ def train(args):
         print(f"CIDEr:    {scores.get('cider', 0.0):.4f}")
         print(f"METEOR:   {scores.get('meteor', 0.0):.4f}")
         
-        # 8. Save weights, metrics and captions
+        # 7. Save weights, metrics and captions
+        checkpoint_dir = project_root / "data" / "checkpoints" / f"{args.caption_method}_{args.vision_type}_{args.fusion_type}_{args.llm_model}"
+        checkpoint_dir.mkdir(parents=True, exist_ok=True)
         
         # Weights
         save_path = checkpoint_dir / f"projector_epoch_{epoch+1}.pt"
