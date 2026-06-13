@@ -6,3 +6,4 @@ logs/
 train.sh
 evaluate_merged_captions.sh
 merge_captions.sh
+src/utils/plots/
