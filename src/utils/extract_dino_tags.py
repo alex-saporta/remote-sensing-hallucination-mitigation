@@ -8,7 +8,7 @@ from transformers import AutoProcessor, AutoModelForZeroShotObjectDetection
 # 1. SETUP ALL ABSOLUTE SERVER PATHS
 PROJECT_ROOT = Path("/home/apolline/project-2-team-1")
 JSON_PATH = PROJECT_ROOT / "data" / "SECOND-CC-AUG.json"  
-OUTPUT_PATH = PROJECT_ROOT / "data" / "marine_tags.json"
+OUTPUT_PATH = PROJECT_ROOT / "data" / "tags" / "dino_tags.json"
 
 # 2. CHOOSE DEVICE AND LOAD NATIVE HUGGING FACE MODEL
 device = "cuda" if torch.cuda.is_available() else "cpu"

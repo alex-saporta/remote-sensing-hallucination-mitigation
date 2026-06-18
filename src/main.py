@@ -17,7 +17,7 @@ def main():
     parser.add_argument("--fusion_type", type=str, default="concat", choices =["concat", "diff"], help="Type of late fusion for the visual embeddings")
     parser.add_argument("--vision_type", type=str, default="RemoteCLIP", choices=['RemoteCLIP', 'SkyCLIP', 'GeoRSCLIP', 'standard'])
     parser.add_argument("--llm_model", type=str, default="mistral-7b", choices=['qwen2.5-7B', 'vicuna-7b', 'mistral-7b', 'llama2-7b'])
-    parser.add_argument("--caption_method", type=str, default="random", choices=['one', 'two', 'three', 'four', 'five', 'random', 'merge'])
+    parser.add_argument("--caption_method", type=str, default="random", choices=['one', 'two', 'three', 'four', 'five', 'random', 'merge', 'all'])
     parser.add_argument("--merge_captions_path", type=str, default="data/merged_captions_qwen.json")
     parser.add_argument("--prompt", type=str, default="Describe the changes between the first image and the second image.", help="The instruction prompt fed to the LLM.")
 
@@ -28,7 +28,7 @@ def main():
 
     # Image Grounded Guidance
     parser.add_argument("--marine", action="store_true", help="Activate logit-level contrastive guidanc.e")
-    parser.add_argument("--guidance_strength", type=float, default=1.5, help="Gamma logit scaling multiplier factor.")
+    parser.add_argument("--guidance_strength", type=float, default=0.7, help="Gamma logit scaling multiplier factor.")
     parser.add_argument("--tags_cache", type=str, default="marine_tags.json", help="Name of the pre-computed tags JSON cache file to load.")
     
     # Evaluation
