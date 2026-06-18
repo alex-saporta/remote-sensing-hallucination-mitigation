@@ -59,7 +59,8 @@ def train(args):
         split="val", 
         caption_method=args.caption_method,
         merge_captions_path=args.merge_captions_path,
-        llm_prompt=args.prompt
+        llm_prompt=args.prompt,
+        tags_cache_name="unified_yolo_prompts.json"
     )
     val_loader = DataLoader(val_dataset, batch_size=1, shuffle=False)
 

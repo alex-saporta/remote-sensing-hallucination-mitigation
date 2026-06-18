@@ -7,7 +7,6 @@ if str(current_dir) not in sys.path:
     sys.path.append(str(current_dir))
 
 from train import train
-from eval_merge_quality import eval_merge_quality
 
 def main():
     parser = argparse.ArgumentParser(description="VLM Remote Sensing Pipeline")
@@ -29,7 +28,7 @@ def main():
     # Image Grounded Guidance
     parser.add_argument("--marine", action="store_true", help="Activate logit-level contrastive guidanc.e")
     parser.add_argument("--guidance_strength", type=float, default=0.7, help="Gamma logit scaling multiplier factor.")
-    parser.add_argument("--tags_cache", type=str, default="marine_tags.json", help="Name of the pre-computed tags JSON cache file to load.")
+    parser.add_argument("--tags_cache", type=str, default="unified_yolo_prompts.json", help="Name of the pre-computed tags JSON cache file to load.")
     
     # Evaluation
     parser.add_argument("--checkpoint", type=str, help="Path to weights for eval mode")
@@ -45,15 +44,6 @@ def main():
         # TODO : placeholder for evaluation logic
         pass
 
-    elif args.mode == "eval_merge":
-        project_root = current_dir.parent
-        data_json = project_root / "data" / "SECOND-CC-AUG.json"
-        merge_json = project_root / args.merge_captions_path
-        eval_merge_quality(
-            merge_json_path=merge_json,
-            original_json_path=data_json,
-            output_file=args.eval_output
-        )
 
 if __name__ == "__main__":
     main()
