@@ -15,7 +15,7 @@ print(f"Loading YOLO-World architecture from: {WEIGHTS_PATH}")
 model = YOLOWorld(str(WEIGHTS_PATH))
 
 # 3. DEFINE TARGET CLEAN VOCABULARY AND CONTEXTUAL PROMPTS
-RAW_VOCABULARY = ["building", "road", "water", "forest", "vegetation", "vehicle", "ship", "bridge", "solar panel"]
+RAW_VOCABULARY = ["building", "road", "water", "vegetation", "vehicle"]
 
 # Contextual modifiers guide the text encoder to match top-down satellite shapes
 CONTEXT_PROMPTS = [

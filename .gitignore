@@ -4,6 +4,9 @@ __pycache__/
 data
 logs/
 train.sh
+test.sh
+train_mitigated.sh
+extract_tags.sh
 evaluate_merged_captions.sh
 merge_captions.sh
 src/utils/plots/

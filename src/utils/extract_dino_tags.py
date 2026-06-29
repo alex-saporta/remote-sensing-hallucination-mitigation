@@ -20,7 +20,7 @@ processor = AutoProcessor.from_pretrained(model_id)
 model = AutoModelForZeroShotObjectDetection.from_pretrained(model_id).to(device)
 
 # 3. DEFINE YOUR GEOGRAPHICAL TARGET VOCABULARY
-VOCABULARY = ["building", "road", "water", "forest", "vegetation", "vehicle", "ship", "bridge", "solar panel"]
+VOCABULARY = ["building", "road", "water", "vegetation", "vehicle"]
 # Grounding DINO expects lower-case items separated by a period and a space
 TEXT_PROMPT = " . ".join(VOCABULARY) + " ."
 

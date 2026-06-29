@@ -81,7 +81,7 @@ transform = Compose([
 ])
 
 # 5. DEFINE YOUR GEOSPATIAL TARGET VOCABULARY
-VOCABULARY = ["building", "road", "water", "forest", "vegetation", "vehicle", "ship", "bridge", "solar panel"]
+VOCABULARY = ["building", "road", "water", "vegetation", "vehicle"]
 
 # 6. LOAD THE DATASET INDEX
 with open(JSON_PATH, "r") as f:
