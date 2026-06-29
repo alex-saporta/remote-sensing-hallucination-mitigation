@@ -241,9 +241,9 @@ class VLM(nn.Module):
             return_dict=True
         )
 
-    def generate(self, pixel_values_a, pixel_values_b, tokenizer, max_new_tokens=50, device="cuda"):
+    def generate(self, pixel_values_a, pixel_values_b, tokenizer, prompt=None, max_new_tokens=50, device="cuda"):
             """
-            Inference method to generate a caption for a given image pair.
+            Inference method to generate a caption (or answer a VQA prompt) for a given image pair.
             """
             self.eval()
             # 1. Encode and fusion images
@@ -261,7 +261,8 @@ class VLM(nn.Module):
                 visual_embeds = visual_embeds.to(self.language_model.dtype)
 
                 # 3. Prepare the prompt
-                input_ids = tokenizer(self.prompt, return_tensors="pt").input_ids.to(device)
+                current_prompt = prompt if prompt is not None else self.prompt
+                input_ids = tokenizer(current_prompt, return_tensors="pt").input_ids.to(device)
                 text_embeds = self.language_model.get_input_embeddings()(input_ids)
 
                 # 4. Concatenate visual prefix with prompt
@@ -271,11 +272,13 @@ class VLM(nn.Module):
                 attention_mask = torch.ones(inputs_embeds.shape[:2], dtype=torch.long, device=device)
 
                 # 5. Generate tokens
+                dynamic_min_tokens = min(15, max_new_tokens)
+
                 output_ids = self.language_model.generate(
                     inputs_embeds=inputs_embeds,
                     attention_mask=attention_mask,
                     max_new_tokens=max_new_tokens,
-                    min_new_tokens=15,
+                    min_new_tokens=dynamic_min_tokens, 
                     do_sample=False, # greedy decoding for consistent metrics
                     num_beams=1, # speed up validation
                     eos_token_id=tokenizer.eos_token_id,

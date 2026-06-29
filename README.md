@@ -1,93 +1,109 @@
-# Project 2 Team 1
+# Hallucination Mitigation for Change Captioning in Remote Sensing
 
+This project implements a Large Vision-Language Model (LVLM) pipeline for Remote Sensing Change Captioning. It features a custom [**MARINE**](https://github.com/Linxi-ZHAO/MARINE) framework designed to mitigate object hallucinations at inference time.
 
+## Overview
+This repository provides a modular pipeline to train, test, and evaluate LVLMs on the [Second-CC Dataset](https://github.com/ChangeCapsInRS/SecondCC). It supports multi-modal fusion, various vision-encoder backbones based on the CLIP ViT Large Patch 14 architecture (Standard ViT-L-14, RemoteCLIP, SkyCLIP, GeoRSCLIP), and includes a suite of standard generative metrics and specialized hallucination benchmarks.
 
-## Getting started
+## Project Structure
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
-
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
-
-## Add your files
-
-* [Create](https://docs.gitlab.com/user/project/repository/web_editor/#create-a-file) or [upload](https://docs.gitlab.com/user/project/repository/web_editor/#upload-a-file) files
-* [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
-
+```text
+project-2-team-1/
+├── data/               # Dataset files and checkpoints
+│   ├── checkpoints/            # Trained model weights
+│   ├── tags/                   # Pre-computed tags for MARINE
+│   ├── test/                   # Test set images
+│   ├── train/                  # Training set images
+│   ├── val/                    # Validation set images
+│   └── SECOND-CC-AUG.json      # Captions for the dataset
+│   └── merged-SECOND-CC.json   # Merged captions for the dataset
+├── src/                # Core source code
+│   ├── utils/             # Metric computation and helpers
+│   ├── data_loader.py     # Dataset loading and processing
+│   ├── inference.py       # Inference engine and MARINE logic
+│   ├── main.py            # Entry point for train/test modes
+│   ├── model.py           # VLM architecture definition
+│   └── train.py           # Training logic
+├── README.md           # Project documentation
 ```
-cd existing_repo
-git remote add origin https://git.tu-berlin.de/rsim/dl4eo-2026-summer/hallucination-mitigation-for-change-captioning-in-remote-sensing/project-2-team-1.git
-git branch -M main
-git push -uf origin main
-```
-
-## Integrate with your tools
-
-* [Set up project integrations](https://git.tu-berlin.de/rsim/dl4eo-2026-summer/hallucination-mitigation-for-change-captioning-in-remote-sensing/project-2-team-1/-/settings/integrations)
-
-## Collaborate with your team
-
-* [Invite team members and collaborators](https://docs.gitlab.com/user/project/members/)
-* [Create a new merge request](https://docs.gitlab.com/user/project/merge_requests/creating_merge_requests/)
-* [Automatically close issues from merge requests](https://docs.gitlab.com/user/project/issues/managing_issues/#closing-issues-automatically)
-* [Enable merge request approvals](https://docs.gitlab.com/user/project/merge_requests/approvals/)
-* [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
-
-## Test and Deploy
-
-Use the built-in continuous integration in GitLab.
-
-* [Get started with GitLab CI/CD](https://docs.gitlab.com/ci/quick_start/)
-* [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/user/application_security/sast/)
-* [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/topics/autodevops/requirements/)
-* [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/user/clusters/agent/)
-* [Set up protected environments](https://docs.gitlab.com/ci/environments/protected_environments/)
-
-***
-
-# Editing this README
-
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
-
-## Suggestions for a good README
-
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
-
-## Name
-Choose a self-explaining name for your project.
-
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
-
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
-
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
 
 ## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+
+Ensure you have [uv](https://docs.astral.sh/uv/) installed on your system. Then, simply run the following commands to set up and activate the environment:
+```bash
+# Clone the repository
+git clone https://git.tu-berlin.de/rsim/dl4eo-2026-summer/hallucination-mitigation-for-change-captioning-in-remote-sensing/project-2-team-1
+cd project-2-team-1
+# Automatically create and activate the virtual environment and install all dependencies
+uv sync
+source .venv/bin/activate
+```
+
+## Data Preparation
+
+Download the [Second-CC dataset](https://github.com/ChangeCapsInRS/SecondCC) and place it in the project root to match the following structure:
+
+```
+project-2-team-1/data/
+├── checkpoints/
+├── tags/
+├── test/
+├── train/
+├── val/
+├── SECOND-CC-AUG.json
+└── merged-SECOND-CC.json
+```
 
 ## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+To discover all the custom possibilities run :
+```
+uv run python src/main.py --help
+```
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+### 1. Training
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+To train the pipeline with custom backbones and parameters :
+```
+uv run python src/main.py \
+    --mode train \
+    --fusion_type concat \
+    --vision_type  standard \
+    --llm_model qwen2.5-7B \
+    --caption_method merge \
+    --merge_captions_path /data/dl4eo_p2g1/data/merged-SECOND-CC.json \
+    --prompt "Given these 2 satellite images, describe in one sentence the geographical changes that occurred :" \
+    --batch_size 16 \
+    --epochs 5 \
+    --lr 1e-4
+```
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+### 2. Testing
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+```
+uv run python src/main.py \
+    --mode test \
+    --checkpoint  "data/checkpoints/merge_standard_concat_qwen2.5-7B/best_projector.pt" \
+    --llm_model "qwen2.5-7B" \
+    --vision_type "standard" \
+    --fusion_type "concat" \
+    --tags_cache "unified_yolo_prompts.json" \
+    --marine \
+    --guidance_strength 0.7 \
+    --prompt "Given these 2 satellite images, describe in one sentence the geographical changes that occurred :"
+```
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+## Metrics
 
-## License
-For open source projects, say how it is licensed.
+The pipeline computes a comprehensive suite of metrics:
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+* **Caption Quality:** BLEU-4, ROUGE-L, CIDEr, METEOR.
+* **Hallucination (Generative):** CHAIR (Caption Hallucination Assessment) and AMBER.
+* **Hallucination (Discriminative):** POPE (Polling-based Object Probing Evaluation).
+
+
+## References
+
+We have made use of the following repositories 
+- [Second-CC dataset](https://github.com/ChangeCapsInRS/SecondCC)
+- [Image Grounded Guidance](https://github.com/Linxi-ZHAO/MARINE)

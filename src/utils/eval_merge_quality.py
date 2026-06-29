@@ -1,7 +1,7 @@
 import json
 import torch
 from pathlib import Path
-from utils.metrics import Metrics
+from metrics import Metrics
 import argparse
 
 def eval_merge_quality(merge_json_path, original_json_path, output_file="merge_quality_results.txt"):
